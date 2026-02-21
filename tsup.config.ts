@@ -6,7 +6,9 @@ const CLIENT_BANNER = '"use client";\n'
 // Shared externals for server/views entries — @dnd-kit is external (not needed on server)
 const serverExternals = [
   'payload',
+  'payload/shared',
   '@payloadcms/ui',
+  '@payloadcms/translations',
   '@payloadcms/next',
   '@payloadcms/next/templates',
   'react',
@@ -26,7 +28,9 @@ const serverExternals = [
 // because consumers may not have @dnd-kit installed
 const clientExternals = [
   'payload',
+  'payload/shared',
   '@payloadcms/ui',
+  '@payloadcms/translations',
   '@payloadcms/next',
   '@payloadcms/next/templates',
   'react',

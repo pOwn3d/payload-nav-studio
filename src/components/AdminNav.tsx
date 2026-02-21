@@ -2,8 +2,10 @@
 
 import React, { useState, useMemo } from 'react'
 import { useNavPreferences } from '../hooks/useNavPreferences.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import { getIconPath } from '../icons.js'
 import type { NavItemConfig, NavGroupConfig } from '../types.js'
+import { resolveLabel } from '../utils.js'
 
 /** Inline SVG icon component using the icon registry */
 const NavIcon: React.FC<{ name: string; size?: number }> = ({ name, size = 16 }) => {
@@ -174,11 +176,15 @@ const ChildIcon: React.FC<{ icon: string }> = ({ icon }) => {
  * Reads per-user preferences from the API, falls back to the defaultNav config.
  */
 const AdminNav: React.FC = () => {
+  const { t, i18n } = usePluginTranslation()
   const { layout, isLoaded } = useNavPreferences()
   const fullUrl = useFullUrl()
   const pathname = fullUrl.split('?')[0]
 
   const isDashboard = pathname === '/admin' || pathname === '/admin/'
+
+  const lang = i18n.language
+  const fallbackLang = i18n.fallbackLanguage as string
 
   // Filter visible groups and items
   const visibleGroups = useMemo(() => {
@@ -211,7 +217,7 @@ const AdminNav: React.FC = () => {
     return (
       <div style={{ ...styles.container, opacity: 0.5 }}>
         <div style={{ padding: '16px', fontSize: 12, color: 'var(--theme-elevation-400)' }}>
-          Loading…
+          {t('plugin-admin-nav:loading')}
         </div>
       </div>
     )
@@ -222,7 +228,7 @@ const AdminNav: React.FC = () => {
       {/* Dashboard link */}
       <a href="/admin" style={styles.dashboardLink(isDashboard)}>
         <NavIcon name="home" />
-        Tableau de bord
+        {t('plugin-admin-nav:dashboard')}
       </a>
 
       {visibleGroups.map((group) => {
@@ -242,7 +248,7 @@ const AdminNav: React.FC = () => {
               }}
               onClick={() => toggleGroup(group.id)}
             >
-              <span>{group.title}</span>
+              <span>{resolveLabel(group.title, lang, fallbackLang)}</span>
               <svg
                 width={12}
                 height={12}
@@ -270,7 +276,7 @@ const AdminNav: React.FC = () => {
                 <React.Fragment key={item.id}>
                   <a href={item.href} style={styles.itemLink(isActive, hasActiveChild)}>
                     <NavIcon name={item.icon} />
-                    {item.label}
+                    {resolveLabel(item.label, lang, fallbackLang)}
                   </a>
 
                   {/* Child items */}
@@ -279,7 +285,7 @@ const AdminNav: React.FC = () => {
                     return (
                       <a key={child.id} href={child.href} style={styles.childLink(isChildActive)}>
                         <ChildIcon icon={child.icon} />
-                        {child.label}
+                        {resolveLabel(child.label, lang, fallbackLang)}
                       </a>
                     )
                   })}
@@ -293,7 +299,7 @@ const AdminNav: React.FC = () => {
       {/* Customize button */}
       <a href="/admin/nav-customizer" style={styles.customizeLink}>
         <NavIcon name="settings" size={12} />
-        Personnaliser
+        {t('plugin-admin-nav:customize')}
       </a>
     </div>
   )

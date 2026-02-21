@@ -1,4 +1,4 @@
-// Server-side exports — plugin, types, collection, icons
+// Server-side exports — plugin, types, collection, icons, utils
 export { adminNavPlugin } from './plugin.js'
 export { createAdminNavPreferencesCollection } from './collections/AdminNavPreferences.js'
 export {
@@ -7,9 +7,11 @@ export {
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
 export { getIconNames, getIconPath, iconPaths } from './icons.js'
+export { resolveLabel, isMultiLang } from './utils.js'
 
 // Types
 export type {
+  LocalizedString,
   NavItemConfig,
   NavGroupConfig,
   NavLayout,

@@ -24,7 +24,9 @@ import { SortableGroup } from './SortableGroup.js'
 import { SortableItem } from './SortableItem.js'
 import { GroupEditor } from './GroupEditor.js'
 import { NavItemEditor } from './NavItemEditor.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig, NavItemConfig } from '../types.js'
+import { resolveLabel } from '../utils.js'
 
 // ── Styles ──
 
@@ -106,9 +108,13 @@ const toastStyle = (visible: boolean, isError: boolean): React.CSSProperties => 
  * editing labels/icons/URLs, creating new groups/items.
  */
 export const NavCustomizer: React.FC = () => {
+  const { t, i18n } = usePluginTranslation()
   const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences()
   const [groups, setGroups] = useState<NavGroupConfig[]>([])
   const [initialized, setInitialized] = useState(false)
+
+  const lang = i18n.language
+  const fallbackLang = i18n.fallbackLanguage as string
 
   // Editors
   const [editingGroup, setEditingGroup] = useState<NavGroupConfig | null>(null)
@@ -149,14 +155,18 @@ export const NavCustomizer: React.FC = () => {
   // Custom collision detection: groups only collide with groups, items with items
   const collisionDetection: CollisionDetection = useCallback((args) => {
     const activeId = args.active.id as string
-    const prefix = activeId.startsWith('group-') ? 'group-' : activeId.startsWith('item-') ? 'item-' : ''
-    if (!prefix) return closestCenter(args)
-    return closestCenter({
-      ...args,
-      droppableContainers: args.droppableContainers.filter(
-        (container) => (container.id as string).startsWith(prefix),
-      ),
-    })
+
+    // Only filter when dragging groups — items use default closestCenter
+    if (activeId.startsWith('group-')) {
+      const groupContainers = args.droppableContainers.filter(
+        (container) => (container.id as string).startsWith('group-'),
+      )
+      if (groupContainers.length > 0) {
+        return closestCenter({ ...args, droppableContainers: groupContainers })
+      }
+    }
+
+    return closestCenter(args)
   }, [])
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -188,13 +198,6 @@ export const NavCustomizer: React.FC = () => {
 
     // Item reordering (within same group or cross-group)
     if (activeStr.startsWith('item-') && overStr.startsWith('item-')) {
-      // Parse: "item-{groupId}-{itemId}"
-      const activeParts = activeStr.split('-').slice(1) // remove 'item' prefix
-      const overParts = overStr.split('-').slice(1)
-
-      // Group IDs can contain dashes, item IDs are at the end
-      // Format: item-{groupId}-{itemId}
-      // We stored data in the sortable, use it
       const activeData = active.data?.current as { groupId?: string; item?: NavItemConfig } | undefined
       const overData = over.data?.current as { groupId?: string; item?: NavItemConfig } | undefined
 
@@ -246,9 +249,9 @@ export const NavCustomizer: React.FC = () => {
   }, [])
 
   const deleteGroup = useCallback((groupId: string) => {
-    if (!window.confirm('Supprimer ce groupe et tous ses items ?')) return
+    if (!window.confirm(t('plugin-admin-nav:deleteGroupConfirm'))) return
     setGroups((prev) => prev.filter((g) => g.id !== groupId))
-  }, [])
+  }, [t])
 
   const saveEditedGroup = useCallback((group: NavGroupConfig) => {
     setGroups((prev) => {
@@ -305,52 +308,69 @@ export const NavCustomizer: React.FC = () => {
 
   const handleSave = useCallback(async () => {
     const success = await save(groups)
-    showToast(success ? 'Navigation sauvegardée !' : 'Erreur lors de la sauvegarde', !success)
-  }, [groups, save, showToast])
+    showToast(success ? t('plugin-admin-nav:savedSuccess') : t('plugin-admin-nav:saveError'), !success)
+  }, [groups, save, showToast, t])
 
   const handleReset = useCallback(async () => {
-    if (!window.confirm('Réinitialiser la navigation par défaut ? Vos personnalisations seront perdues.')) return
+    if (!window.confirm(t('plugin-admin-nav:resetConfirm'))) return
     const success = await reset()
     if (success) {
       setInitialized(false) // Will reload from layout
-      showToast('Navigation réinitialisée')
+      showToast(t('plugin-admin-nav:resetSuccess'))
     } else {
-      showToast('Erreur lors de la réinitialisation', true)
+      showToast(t('plugin-admin-nav:resetError'), true)
     }
-  }, [reset, showToast])
+  }, [reset, showToast, t])
 
   // ── Render ──
 
   if (!isLoaded) {
     return (
       <div style={containerStyle}>
-        <p style={{ color: 'var(--theme-elevation-400)', fontSize: 14 }}>Chargement...</p>
+        <p style={{ color: 'var(--theme-elevation-400)', fontSize: 14 }}>{t('plugin-admin-nav:loading')}</p>
       </div>
     )
   }
 
   const groupIds = groups.map((g) => `group-${g.id}`)
 
+  // Resolve the label for the drag overlay
+  const getOverlayLabel = (): string => {
+    if (!activeId) return ''
+    if (activeId.startsWith('group-')) {
+      const group = groups.find((g) => g.id === activeId.replace('group-', ''))
+      return group ? resolveLabel(group.title, lang, fallbackLang) : activeId
+    }
+    for (const g of groups) {
+      for (const item of g.items) {
+        if (`item-${g.id}-${item.id}` === activeId) {
+          return resolveLabel(item.label, lang, fallbackLang)
+        }
+      }
+    }
+    return activeId
+  }
+
   return (
     <div style={containerStyle}>
       {/* Header */}
       <div style={headerStyle}>
-        <h1 style={titleStyle}>Personnaliser la navigation</h1>
+        <h1 style={titleStyle}>{t('plugin-admin-nav:customizeTitle')}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           {isCustom && (
             <button onClick={handleReset} style={btnSecondary} disabled={isSaving}>
-              Réinitialiser
+              {t('plugin-admin-nav:reset')}
             </button>
           )}
           <button onClick={handleSave} style={btnPrimary} disabled={isSaving}>
-            {isSaving ? 'Enregistrement...' : 'Sauvegarder'}
+            {isSaving ? t('plugin-admin-nav:saving') : t('plugin-admin-nav:save')}
           </button>
         </div>
       </div>
 
       {/* Hint */}
       <p style={{ fontSize: 12, color: 'var(--theme-elevation-500)', marginBottom: 16 }}>
-        Glissez-déposez les groupes et items pour réorganiser. Utilisez les icônes pour masquer, modifier ou supprimer.
+        {t('plugin-admin-nav:dndHint')}
       </p>
 
       {/* DnD area */}
@@ -392,7 +412,7 @@ export const NavCustomizer: React.FC = () => {
                     onClick={() => setIsCreatingItem(group.id)}
                     style={{ ...btnOutline, padding: '4px 8px', fontSize: 11, border: '1px dashed var(--theme-elevation-250)' }}
                   >
-                    + Ajouter un item
+                    {t('plugin-admin-nav:addItem')}
                   </button>
                 </div>
               </SortableGroup>
@@ -414,17 +434,7 @@ export const NavCustomizer: React.FC = () => {
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               cursor: 'grabbing',
             }}>
-              {activeId.startsWith('group-')
-                ? groups.find((g) => g.id === activeId.replace('group-', ''))?.title
-                : (() => {
-                    for (const g of groups) {
-                      for (const item of g.items) {
-                        if (`item-${g.id}-${item.id}` === activeId) return item.label
-                      }
-                    }
-                    return activeId
-                  })()
-              }
+              {getOverlayLabel()}
             </div>
           ) : null}
         </DragOverlay>
@@ -432,7 +442,7 @@ export const NavCustomizer: React.FC = () => {
 
       {/* Add group button */}
       <button onClick={() => setIsCreatingGroup(true)} style={btnOutline}>
-        + Ajouter un groupe
+        {t('plugin-admin-nav:addGroup')}
       </button>
 
       {/* Modals */}
@@ -457,7 +467,7 @@ export const NavCustomizer: React.FC = () => {
           item={{
             id: `item-${Date.now()}`,
             href: '/admin/',
-            label: 'Nouveau lien',
+            label: t('plugin-admin-nav:newLink'),
             icon: 'file-text',
             visible: true,
           }}

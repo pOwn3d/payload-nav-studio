@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react'
 import { IconPicker } from './IconPicker.js'
-import type { NavItemConfig } from '../types.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
+import type { NavItemConfig, LocalizedString } from '../types.js'
+import { isMultiLang, resolveLabel } from '../utils.js'
 
 interface NavItemEditorProps {
   item: NavItemConfig
@@ -30,7 +32,17 @@ const labelStyle: React.CSSProperties = {
 }
 
 export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCancel }) => {
-  const [label, setLabel] = useState(item.label)
+  const { t, i18n } = usePluginTranslation()
+
+  // Multi-lang state for label
+  const [useMultiLang, setUseMultiLang] = useState(() => isMultiLang(item.label))
+  const [label, setLabel] = useState(() => resolveLabel(item.label, i18n.language, i18n.fallbackLanguage as string))
+  const [labelRecord, setLabelRecord] = useState<Record<string, string>>(() => {
+    if (isMultiLang(item.label)) return { ...item.label }
+    const fallback = resolveLabel(item.label, i18n.language, i18n.fallbackLanguage as string)
+    return { [i18n.language]: fallback }
+  })
+
   const [href, setHref] = useState(item.href)
   const [icon, setIcon] = useState(item.icon)
   const [matchPrefix, setMatchPrefix] = useState(item.matchPrefix ?? false)
@@ -39,10 +51,32 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   const [editingChildIndex, setEditingChildIndex] = useState<number | null>(null)
   const [childDraft, setChildDraft] = useState<{ label: string; href: string; icon: string }>({ label: '', href: '', icon: '#888888' })
 
+  const getResolvedLabel = (): string => {
+    if (useMultiLang) return labelRecord[i18n.language] || Object.values(labelRecord).find(Boolean) || ''
+    return label
+  }
+
+  const getFinalLabel = (): LocalizedString => {
+    if (useMultiLang) {
+      const filtered: Record<string, string> = {}
+      for (const [k, v] of Object.entries(labelRecord)) {
+        if (v.trim()) filtered[k] = v.trim()
+      }
+      return Object.keys(filtered).length > 0 ? filtered : ''
+    }
+    return label.trim()
+  }
+
+  // Available languages from Payload i18n
+  const availableLangs = Object.keys(
+    (i18n as unknown as { translations?: Record<string, unknown> }).translations || { [i18n.language]: true },
+  )
+
   const handleSave = () => {
+    const finalLabel = getFinalLabel()
     onSave({
       ...item,
-      label: label.trim() || item.label,
+      label: finalLabel || item.label,
       href: href.trim() || item.href,
       icon,
       matchPrefix,
@@ -65,7 +99,11 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   const startEditChild = (index: number) => {
     const child = children[index]
     setEditingChildIndex(index)
-    setChildDraft({ label: child.label, href: child.href, icon: child.icon })
+    setChildDraft({
+      label: resolveLabel(child.label, i18n.language, i18n.fallbackLanguage as string),
+      href: child.href,
+      icon: child.icon,
+    })
   }
 
   const saveChild = () => {
@@ -89,9 +127,12 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   }
 
   const cancelEditChild = () => {
-    if (editingChildIndex !== null && !children[editingChildIndex].label) {
-      // Was a new empty child — remove it
-      removeChild(editingChildIndex)
+    if (editingChildIndex !== null) {
+      const childLabel = resolveLabel(children[editingChildIndex].label, i18n.language, i18n.fallbackLanguage as string)
+      if (!childLabel) {
+        // Was a new empty child — remove it
+        removeChild(editingChildIndex)
+      }
     }
     setEditingChildIndex(null)
   }
@@ -140,24 +181,59 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--theme-text)' }}>
-          Modifier l'item
+          {t('plugin-admin-nav:editItem')}
         </h3>
 
         {/* Label */}
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Label</label>
-          <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} style={fieldStyle} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>{t('plugin-admin-nav:labelField')}</label>
+            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--theme-elevation-500)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={useMultiLang}
+                onChange={(e) => {
+                  setUseMultiLang(e.target.checked)
+                  if (e.target.checked && label.trim()) {
+                    setLabelRecord((prev) => ({ ...prev, [i18n.language]: label.trim() }))
+                  } else if (!e.target.checked) {
+                    setLabel(getResolvedLabel())
+                  }
+                }}
+              />
+              {t('plugin-admin-nav:multiLang')}
+            </label>
+          </div>
+
+          {useMultiLang ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {availableLangs.map((lang) => (
+                <div key={lang} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--theme-elevation-400)', width: 20, textAlign: 'center', textTransform: 'uppercase' }}>{lang}</span>
+                  <input
+                    type="text"
+                    value={labelRecord[lang] || ''}
+                    onChange={(e) => setLabelRecord((prev) => ({ ...prev, [lang]: e.target.value }))}
+                    style={fieldStyle}
+                    autoFocus={lang === i18n.language}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} style={fieldStyle} />
+          )}
         </div>
 
         {/* URL */}
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>URL</label>
+          <label style={labelStyle}>{t('plugin-admin-nav:urlField')}</label>
           <input type="text" value={href} onChange={(e) => setHref(e.target.value)} style={fieldStyle} />
         </div>
 
         {/* Icon */}
         <div style={{ marginBottom: 12, position: 'relative' }}>
-          <label style={labelStyle}>Icône</label>
+          <label style={labelStyle}>{t('plugin-admin-nav:iconField')}</label>
           <button
             onClick={() => setShowIconPicker(!showIconPicker)}
             style={{
@@ -188,7 +264,7 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
               checked={matchPrefix}
               onChange={(e) => setMatchPrefix(e.target.checked)}
             />
-            Match prefix (actif si l'URL commence par le href)
+            {t('plugin-admin-nav:matchPrefix')}
           </label>
         </div>
 
@@ -202,7 +278,7 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: children.length > 0 ? 8 : 0 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--theme-elevation-500)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Sous-menus ({children.length})
+              {t('plugin-admin-nav:submenus')} ({children.length})
             </span>
             <button
               type="button"
@@ -218,13 +294,13 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
                 padding: '2px 0',
               }}
             >
-              + Ajouter
+              {t('plugin-admin-nav:addSubmenu')}
             </button>
           </div>
 
           {children.length === 0 && editingChildIndex === null && (
             <div style={{ fontSize: 11, color: 'var(--theme-elevation-400)', fontStyle: 'italic' }}>
-              Aucun sous-menu
+              {t('plugin-admin-nav:noSubmenus')}
             </div>
           )}
 
@@ -249,20 +325,20 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
                   )}
                   {/* Label + href */}
                   <span style={{ fontSize: 12, color: 'var(--theme-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {child.label || <em style={{ color: 'var(--theme-elevation-300)' }}>sans label</em>}
+                    {resolveLabel(child.label, i18n.language, i18n.fallbackLanguage as string) || <em style={{ color: 'var(--theme-elevation-300)' }}>{t('plugin-admin-nav:noLabel')}</em>}
                   </span>
                   <span style={{ fontSize: 10, color: 'var(--theme-elevation-400)', flexShrink: 0, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {child.href}
                   </span>
                   {/* Action buttons */}
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-                    <button type="button" onClick={() => moveChild(index, -1)} disabled={index === 0} title="Monter"
+                    <button type="button" onClick={() => moveChild(index, -1)} disabled={index === 0} title={t('plugin-admin-nav:moveUp')}
                       style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', color: index === 0 ? 'var(--theme-elevation-200)' : 'var(--theme-elevation-500)' }}>↑</button>
-                    <button type="button" onClick={() => moveChild(index, 1)} disabled={index === children.length - 1} title="Descendre"
+                    <button type="button" onClick={() => moveChild(index, 1)} disabled={index === children.length - 1} title={t('plugin-admin-nav:moveDown')}
                       style={{ background: 'none', border: 'none', cursor: index === children.length - 1 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', color: index === children.length - 1 ? 'var(--theme-elevation-200)' : 'var(--theme-elevation-500)' }}>↓</button>
-                    <button type="button" onClick={() => startEditChild(index)} title="Modifier"
+                    <button type="button" onClick={() => startEditChild(index)} title={t('plugin-admin-nav:edit')}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 2px', color: 'var(--theme-elevation-500)' }}>✏️</button>
-                    <button type="button" onClick={() => removeChild(index)} title="Supprimer"
+                    <button type="button" onClick={() => removeChild(index)} title={t('plugin-admin-nav:delete')}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 2px', color: 'var(--theme-error-500)' }}>✕</button>
                   </div>
                 </div>
@@ -277,28 +353,28 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
                   border: '1px solid var(--theme-elevation-200)',
                 }}>
                   <div style={{ marginBottom: 6 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>Label</label>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:labelField')}</label>
                     <input type="text" value={childDraft.label} onChange={(e) => setChildDraft({ ...childDraft, label: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} autoFocus placeholder="Ex: Tickets ouverts" />
+                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} autoFocus placeholder={t('plugin-admin-nav:childLabelPlaceholder')} />
                   </div>
                   <div style={{ marginBottom: 6 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>URL</label>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:urlField')}</label>
                     <input type="text" value={childDraft.href} onChange={(e) => setChildDraft({ ...childDraft, href: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder="Ex: /admin/collections/tickets?status=open" />
+                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder={t('plugin-admin-nav:childUrlPlaceholder')} />
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>Icône (nom ou #couleur)</label>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:childIconLabel')}</label>
                     <input type="text" value={childDraft.icon} onChange={(e) => setChildDraft({ ...childDraft, icon: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder="#00E5FF ou ChevronRight" />
+                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder={t('plugin-admin-nav:childIconPlaceholder')} />
                   </div>
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                     <button type="button" onClick={cancelEditChild}
                       style={{ fontSize: 11, padding: '3px 10px', border: '1px solid var(--theme-elevation-200)', borderRadius: 4, background: 'none', cursor: 'pointer', color: 'var(--theme-text)' }}>
-                      Annuler
+                      {t('plugin-admin-nav:cancel')}
                     </button>
                     <button type="button" onClick={saveChild}
                       style={{ fontSize: 11, padding: '3px 10px', border: 'none', borderRadius: 4, backgroundColor: 'var(--theme-success-500)', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
-                      OK
+                      {t('plugin-admin-nav:ok')}
                     </button>
                   </div>
                 </div>
@@ -321,7 +397,7 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
               color: 'var(--theme-text)',
             }}
           >
-            Annuler
+            {t('plugin-admin-nav:cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -336,7 +412,7 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
               cursor: 'pointer',
             }}
           >
-            Sauvegarder
+            {t('plugin-admin-nav:save')}
           </button>
         </div>
       </div>
