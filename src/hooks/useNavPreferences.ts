@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { NavLayout, NavGroupConfig } from '../types.js'
 
+const CACHE_KEY = 'admin-nav-layout'
+const CACHE_DEFAULT_KEY = 'admin-nav-default'
+const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
+
 interface UseNavPreferencesReturn {
   /** Current nav layout (user's custom or default) */
   layout: NavGroupConfig[]
@@ -18,16 +22,58 @@ interface UseNavPreferencesReturn {
   reload: () => Promise<void>
 }
 
+/** Read cached layout from sessionStorage */
+function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; isCustom: boolean } | null {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY)
+    if (!raw) return null
+    const layout = JSON.parse(raw)
+    const defaultRaw = sessionStorage.getItem(CACHE_DEFAULT_KEY)
+    const defaultNav = defaultRaw ? JSON.parse(defaultRaw) : []
+    const isCustom = sessionStorage.getItem(CACHE_CUSTOM_KEY) === '1'
+    return { layout, defaultNav, isCustom }
+  } catch {
+    return null
+  }
+}
+
+/** Write layout to sessionStorage cache */
+function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCustom: boolean): void {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify(layout))
+    sessionStorage.setItem(CACHE_DEFAULT_KEY, JSON.stringify(defaultNav))
+    sessionStorage.setItem(CACHE_CUSTOM_KEY, isCustom ? '1' : '0')
+  } catch {
+    // sessionStorage full or unavailable — not critical
+  }
+}
+
+/** Clear the nav cache */
+function clearCache(): void {
+  try {
+    sessionStorage.removeItem(CACHE_KEY)
+    sessionStorage.removeItem(CACHE_DEFAULT_KEY)
+    sessionStorage.removeItem(CACHE_CUSTOM_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 /**
  * Hook to fetch, save, and reset nav preferences for the current user.
  * Falls back to the default nav from the plugin config endpoint.
+ *
+ * Uses sessionStorage to cache the layout, so navigation between pages
+ * is instant (no loading flash). Syncs with the server in the background.
  */
 export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPreferencesReturn {
-  const [layout, setLayout] = useState<NavGroupConfig[]>([])
-  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>([])
-  const [isLoaded, setIsLoaded] = useState(false)
+  // Initialize from cache if available (instant render, no flash)
+  const cached = useRef(readCache())
+  const [layout, setLayout] = useState<NavGroupConfig[]>(cached.current?.layout ?? [])
+  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>(cached.current?.defaultNav ?? [])
+  const [isLoaded, setIsLoaded] = useState(!!cached.current)
   const [isSaving, setIsSaving] = useState(false)
-  const [isCustom, setIsCustom] = useState(false)
+  const [isCustom, setIsCustom] = useState(cached.current?.isCustom ?? false)
   const abortRef = useRef<AbortController | null>(null)
 
   const loadPreferences = useCallback(async () => {
@@ -52,17 +98,26 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       const defaultData = await defaultRes.json()
       const prefsData = await prefsRes.json()
 
-      setDefaultNav(defaultData.defaultNav || [])
+      const newDefaultNav = defaultData.defaultNav || []
+      setDefaultNav(newDefaultNav)
+
+      let newLayout: NavGroupConfig[]
+      let newIsCustom: boolean
 
       if (prefsData.navLayout && prefsData.navLayout.groups) {
-        setLayout(prefsData.navLayout.groups)
-        setIsCustom(true)
+        newLayout = prefsData.navLayout.groups
+        newIsCustom = true
       } else {
-        setLayout(defaultData.defaultNav || [])
-        setIsCustom(false)
+        newLayout = newDefaultNav
+        newIsCustom = false
       }
 
+      setLayout(newLayout)
+      setIsCustom(newIsCustom)
       setIsLoaded(true)
+
+      // Persist to cache for instant render on next navigation
+      writeCache(newLayout, newDefaultNav, newIsCustom)
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.warn('[admin-nav] Error loading preferences:', err)
@@ -72,6 +127,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   }, [basePath])
 
   useEffect(() => {
+    // Always fetch in background (even if cached) to stay in sync
     loadPreferences()
     return () => { abortRef.current?.abort() }
   }, [loadPreferences])
@@ -89,6 +145,8 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       if (res.ok) {
         setLayout(groups)
         setIsCustom(true)
+        // Update cache immediately
+        writeCache(groups, defaultNav, true)
         return true
       }
       return false
@@ -97,7 +155,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
     } finally {
       setIsSaving(false)
     }
-  }, [basePath])
+  }, [basePath, defaultNav])
 
   const reset = useCallback(async (): Promise<boolean> => {
     setIsSaving(true)
@@ -106,6 +164,8 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       if (res.ok) {
         setLayout(defaultNav)
         setIsCustom(false)
+        // Update cache with defaults
+        writeCache(defaultNav, defaultNav, false)
         return true
       }
       return false
