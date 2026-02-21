@@ -213,18 +213,13 @@ const AdminNav: React.FC = () => {
     setCollapsed((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
   }
 
-  if (!isLoaded) {
-    return (
-      <div style={{ ...styles.container, opacity: 0.5 }}>
-        <div style={{ padding: '16px', fontSize: 12, color: 'var(--theme-elevation-400)' }}>
-          {t('plugin-admin-nav:loading')}
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div style={styles.container}>
+    <div style={{
+      ...styles.container,
+      opacity: isLoaded ? 1 : 0,
+      transition: 'opacity 0.15s ease-in',
+      minHeight: isLoaded ? undefined : 200,
+    }}>
       {/* Dashboard link */}
       <a href="/admin" style={styles.dashboardLink(isDashboard)}>
         <NavIcon name="home" />
