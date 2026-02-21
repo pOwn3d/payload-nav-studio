@@ -5,6 +5,16 @@ const CACHE_KEY = 'admin-nav-layout'
 const CACHE_DEFAULT_KEY = 'admin-nav-default'
 const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
 
+// ── Module-level cache ──
+// These variables live in the JS module scope and survive React component
+// re-mounts during SPA navigation. On the server they are always null,
+// which matches the empty initial state → no hydration mismatch.
+// After the first successful fetch on the client, they are populated,
+// so subsequent mounts get instant data without waiting for useEffect.
+let _cachedLayout: NavGroupConfig[] | null = null
+let _cachedDefaultNav: NavGroupConfig[] | null = null
+let _cachedIsCustom: boolean | null = null
+
 interface UseNavPreferencesReturn {
   /** Current nav layout (user's custom or default) */
   layout: NavGroupConfig[]
@@ -37,19 +47,27 @@ function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; 
   }
 }
 
-/** Write layout to sessionStorage cache */
+/** Write layout to both module cache and sessionStorage */
 function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCustom: boolean): void {
+  // Module cache (instant on re-mount)
+  _cachedLayout = layout
+  _cachedDefaultNav = defaultNav
+  _cachedIsCustom = isCustom
+  // sessionStorage (survives full page reload)
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(layout))
     sessionStorage.setItem(CACHE_DEFAULT_KEY, JSON.stringify(defaultNav))
     sessionStorage.setItem(CACHE_CUSTOM_KEY, isCustom ? '1' : '0')
   } catch {
-    // sessionStorage full or unavailable — not critical
+    // sessionStorage full or unavailable — module cache still works
   }
 }
 
-/** Clear the nav cache */
+/** Clear both module cache and sessionStorage */
 function clearCache(): void {
+  _cachedLayout = null
+  _cachedDefaultNav = null
+  _cachedIsCustom = null
   try {
     sessionStorage.removeItem(CACHE_KEY)
     sessionStorage.removeItem(CACHE_DEFAULT_KEY)
@@ -63,19 +81,23 @@ function clearCache(): void {
  * Hook to fetch, save, and reset nav preferences for the current user.
  * Falls back to the default nav from the plugin config endpoint.
  *
- * Uses sessionStorage to cache the layout, so navigation between pages
- * is instant (no loading flash). Syncs with the server in the background.
+ * Uses a two-tier cache for instant rendering:
+ * 1. Module-level variables — survive component re-mounts during SPA
+ *    navigation (the common case). Available immediately in useState.
+ * 2. sessionStorage — survives full page reloads. Read in useEffect
+ *    (post-hydration) to avoid React hydration mismatch #418.
  *
- * Cache is read inside useEffect (not useState) to avoid React hydration
- * mismatch — sessionStorage is only available on the client.
+ * On the server, module vars are null → layout=[] → matches client
+ * first render. After the first fetch, module vars are populated →
+ * subsequent mounts get instant data (no flash).
  */
 export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPreferencesReturn {
-  // Always start with empty state (matches server render — avoids hydration error #418)
-  const [layout, setLayout] = useState<NavGroupConfig[]>([])
-  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>([])
-  const [isLoaded, setIsLoaded] = useState(false)
+  // Use module cache if available (SPA re-mount), otherwise empty (SSR-safe)
+  const [layout, setLayout] = useState<NavGroupConfig[]>(_cachedLayout ?? [])
+  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>(_cachedDefaultNav ?? [])
+  const [isLoaded, setIsLoaded] = useState(_cachedLayout !== null)
   const [isSaving, setIsSaving] = useState(false)
-  const [isCustom, setIsCustom] = useState(false)
+  const [isCustom, setIsCustom] = useState(_cachedIsCustom ?? false)
   const abortRef = useRef<AbortController | null>(null)
 
   const loadPreferences = useCallback(async () => {
@@ -118,7 +140,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       setIsCustom(newIsCustom)
       setIsLoaded(true)
 
-      // Persist to cache for instant render on next navigation
+      // Persist to both caches for instant render
       writeCache(newLayout, newDefaultNav, newIsCustom)
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
@@ -129,13 +151,20 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   }, [basePath])
 
   useEffect(() => {
-    // Read from cache first for instant display (client-only, post-hydration)
-    const cached = readCache()
-    if (cached) {
-      setLayout(cached.layout)
-      setDefaultNav(cached.defaultNav)
-      setIsCustom(cached.isCustom)
-      setIsLoaded(true)
+    // If module cache was empty (first mount / page reload),
+    // try sessionStorage as fallback (client-only, post-hydration)
+    if (!_cachedLayout) {
+      const cached = readCache()
+      if (cached) {
+        setLayout(cached.layout)
+        setDefaultNav(cached.defaultNav)
+        setIsCustom(cached.isCustom)
+        setIsLoaded(true)
+        // Populate module cache for future re-mounts
+        _cachedLayout = cached.layout
+        _cachedDefaultNav = cached.defaultNav
+        _cachedIsCustom = cached.isCustom
+      }
     }
 
     // Always fetch in background to stay in sync with server
