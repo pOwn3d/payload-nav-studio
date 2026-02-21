@@ -8,10 +8,17 @@
  * - API endpoints for preferences CRUD
  * - Admin view at /admin/nav-customizer
  * - i18n support (FR/EN, extensible)
+ * - Auto-discovery: generates nav from collections/globals/views if no defaultNav
  *
  * Usage:
  *   import { adminNavPlugin } from '@consilioweb/admin-nav'
  *
+ *   // Minimal — auto-discovers nav from Payload config
+ *   export default buildConfig({
+ *     plugins: [adminNavPlugin()],
+ *   })
+ *
+ *   // Custom — provide your own nav layout
  *   export default buildConfig({
  *     plugins: [
  *       adminNavPlugin({
@@ -33,15 +40,23 @@ import {
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
 import { translations } from './translations/index.js'
+import { autoDiscoverNav } from './autoDiscover.js'
 
 export const adminNavPlugin =
-  (pluginConfig: AdminNavPluginConfig): Plugin =>
+  (pluginConfig?: AdminNavPluginConfig): Plugin =>
   (incomingConfig: Config): Config => {
     console.log('[admin-nav-plugin] Running plugin...')
     const config = { ...incomingConfig }
-    const collectionSlug = pluginConfig.collectionSlug ?? 'admin-nav-preferences'
-    const userCollectionSlug = pluginConfig.userCollectionSlug ?? 'users'
-    const basePath = pluginConfig.endpointBasePath ?? '/admin-nav'
+    const safeConfig = pluginConfig ?? {}
+    const collectionSlug = safeConfig.collectionSlug ?? 'admin-nav-preferences'
+    const userCollectionSlug = safeConfig.userCollectionSlug ?? 'users'
+    const basePath = safeConfig.endpointBasePath ?? '/admin-nav'
+
+    // Resolve defaultNav: use provided config or auto-discover from Payload config
+    const defaultNav = safeConfig.defaultNav ?? autoDiscoverNav(incomingConfig)
+    if (!safeConfig.defaultNav) {
+      console.log(`[admin-nav-plugin] Auto-discovered ${defaultNav.length} nav group(s) from Payload config`)
+    }
 
     // 1. Merge i18n translations
     config.i18n = {
@@ -80,7 +95,7 @@ export const adminNavPlugin =
     if (!config.admin.components) config.admin.components = {}
 
     // Replace existing beforeNavLinks with our AdminNav
-    const navComponent = pluginConfig.navComponentPath ?? '@consilioweb/admin-nav/client#AdminNav'
+    const navComponent = safeConfig.navComponentPath ?? '@consilioweb/admin-nav/client#AdminNav'
     const existingBeforeNav = config.admin.components.beforeNavLinks || []
     config.admin.components.beforeNavLinks = [
       navComponent,
@@ -89,16 +104,16 @@ export const adminNavPlugin =
     console.log('[admin-nav-plugin] beforeNavLinks set to:', config.admin.components.beforeNavLinks)
 
     // Add afterNav components if specified
-    if (pluginConfig.afterNav?.length) {
+    if (safeConfig.afterNav?.length) {
       const existingAfterNav = config.admin.components.afterNavLinks || []
       config.admin.components.afterNavLinks = [
         ...(Array.isArray(existingAfterNav) ? existingAfterNav : [existingAfterNav]),
-        ...pluginConfig.afterNav,
+        ...safeConfig.afterNav,
       ]
     }
 
     // 5. Add the customizer admin view
-    if (pluginConfig.addCustomizerView !== false) {
+    if (safeConfig.addCustomizerView !== false) {
       if (!config.admin.components.views) config.admin.components.views = {}
       ;(config.admin.components.views as Record<string, unknown>)['nav-customizer'] = {
         Component: '@consilioweb/admin-nav/views#NavCustomizerView',
@@ -115,8 +130,8 @@ export const adminNavPlugin =
         method: 'get' as const,
         handler: async () => {
           return Response.json({
-            defaultNav: pluginConfig.defaultNav,
-            afterNav: pluginConfig.afterNav || [],
+            defaultNav,
+            afterNav: safeConfig.afterNav || [],
             basePath: `/api${basePath}`,
           })
         },

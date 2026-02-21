@@ -43,8 +43,12 @@ export interface NavLayout {
 
 /** Plugin configuration options */
 export interface AdminNavPluginConfig {
-  /** Default navigation layout — the initial sidebar structure */
-  defaultNav: NavGroupConfig[]
+  /**
+   * Default navigation layout — the initial sidebar structure.
+   * If not provided, the plugin auto-discovers collections, globals, and views
+   * from the Payload config and generates a navigation layout automatically.
+   */
+  defaultNav?: NavGroupConfig[]
   /** Components to render after the nav (e.g. NotificationCenter paths) */
   afterNav?: string[]
   /** Collection slug for preferences storage (default: 'admin-nav-preferences') */
