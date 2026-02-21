@@ -2,7 +2,7 @@
 <div align="center">
 
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fadmin-nav;Payload+CMS+Sidebar+Plugin;Drag+%26+Drop+%7C+Per-User+Prefs;70%2B+Icons+%7C+i18n+Ready" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fadmin-nav;Payload+CMS+Sidebar+Plugin;Drag+%26+Drop+%7C+Per-User+Prefs;70%2B+Icons+%7C+i18n+Ready;Zero-Config+%7C+Instant+Render" alt="Typing SVG" />
   </a>
 
   <br><br>
@@ -61,7 +61,16 @@
       <b>Multi-lang Labels</b><br>
       <sub>Per-language nav labels</sub>
     </td>
-    <td align="center" colspan="2"></td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/automation.png" width="50"/><br>
+      <b>Auto-Discovery</b><br>
+      <sub>Zero-config mode</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/speed.png" width="50"/><br>
+      <b>Instant Render</b><br>
+      <sub>Two-tier cache, no flash</sub>
+    </td>
   </tr>
 </table>
 
@@ -88,6 +97,7 @@
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Zero-Config Mode](#zero-config-mode)
 - [Configuration](#configuration)
 - [Internationalization (i18n)](#internationalization-i18n)
 - [Built-in Icons](#built-in-icons)
@@ -149,6 +159,22 @@ Inline SVG icons (Lucide-compatible, 24x24 viewBox) — zero external dependenci
 - **Auto-detection** — existing `Record<string, string>` labels open in multi-lang mode automatically
 - **Fallback chain** — resolves: exact language → fallback language → first available value
 - **Extensible** — follows Payload's `deepMergeSimple` pattern, so you can override any translation key
+
+### Auto-Discovery (Zero-Config)
+
+- **No config needed** — call `adminNavPlugin()` with no arguments
+- **Collections** — grouped by `admin.group`, hidden collections excluded
+- **Globals** — added to a "Configuration" group
+- **Custom views** — detected and added to a "Views" group
+- **Smart icons** — 40+ slug-to-icon mappings (fallback: `box`)
+- **Fully customizable** — use `autoDiscoverNav()` to generate a base, then modify
+
+### Instant Rendering
+
+- **Two-tier cache** — module-level (survives SPA navigation) + sessionStorage (survives page reload)
+- **No loading flash** — nav renders instantly on page transitions
+- **Background sync** — always fetches fresh data from the server after rendering the cache
+- **SSR-safe** — module cache is `null` on the server, matching client initial state (no hydration mismatch)
 
 ### Admin View
 
@@ -239,13 +265,52 @@ That's it. The plugin will automatically:
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
+## Zero-Config Mode
+
+If you don't provide a `defaultNav`, the plugin **auto-discovers** your Payload config and builds the navigation automatically:
+
+```ts
+import { adminNavPlugin } from '@consilioweb/admin-nav'
+
+export default buildConfig({
+  plugins: [
+    adminNavPlugin(), // No config needed — collections, globals & views are auto-detected
+  ],
+})
+```
+
+Auto-discovery will:
+
+- Group collections by their `admin.group` value (or "Collections" as fallback)
+- Add globals to a "Configuration" group
+- Add custom admin views to a "Views" group
+- Guess icons from 40+ slug mappings (e.g. `pages` → `file-text`, `users` → `users`, `media` → `image`)
+- Skip hidden collections (`admin.hidden: true`)
+
+You can also use `autoDiscoverNav` programmatically to generate a base config, then customize it:
+
+```ts
+import { adminNavPlugin, autoDiscoverNav } from '@consilioweb/admin-nav'
+
+const baseNav = autoDiscoverNav(config)
+// Modify baseNav as needed...
+
+export default buildConfig({
+  plugins: [
+    adminNavPlugin({ defaultNav: baseNav }),
+  ],
+})
+```
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
 ## Configuration
 
 ### `AdminNavPluginConfig`
 
 ```ts
 adminNavPlugin({
-  defaultNav: [],                           // Required — initial sidebar structure
+  defaultNav: [],                           // Optional — auto-discovered if omitted
   afterNav: [],                             // Component paths to render after the nav
   collectionSlug: 'admin-nav-preferences',  // Preferences collection slug
   userCollectionSlug: 'users',              // User collection for the relationship
@@ -257,7 +322,7 @@ adminNavPlugin({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `defaultNav` | `NavGroupConfig[]` | — | **Required.** Initial sidebar structure with groups and items |
+| `defaultNav` | `NavGroupConfig[]` | Auto-discovered | Initial sidebar structure. If omitted, the plugin auto-discovers collections, globals, and views from your Payload config |
 | `afterNav` | `string[]` | `[]` | Component paths to render after the navigation |
 | `collectionSlug` | `string` | `'admin-nav-preferences'` | Collection slug for preferences storage |
 | `userCollectionSlug` | `string` | `'users'` | User collection slug for the relationship |
@@ -552,6 +617,16 @@ function MyComponent() {
 | `reset` | `() => Promise<void>` | Reset to default navigation |
 | `reload` | `() => Promise<void>` | Reload preferences from server |
 
+### Caching Strategy
+
+The hook uses a **two-tier cache** for instant rendering with zero flash:
+
+1. **Module-level cache** — JavaScript variables at the module scope survive React component re-mounts during SPA navigation. The layout is available immediately in `useState()`, so subsequent page navigations render the nav instantly with no loading state.
+
+2. **sessionStorage cache** — Persists across full page reloads. Read in `useEffect` (post-hydration) to avoid React hydration mismatch errors.
+
+On the server, module variables are always `null`, matching the empty initial state on the client — no hydration mismatch. After the first successful fetch, both caches are populated and all subsequent renders are instant.
+
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
 ## Components
@@ -584,6 +659,7 @@ function MyComponent() {
 // Main entry — plugin, collection, endpoints, icons, types, i18n utilities
 import {
   adminNavPlugin,
+  autoDiscoverNav,
   createAdminNavPreferencesCollection,
   createGetPreferencesHandler,
   createSavePreferencesHandler,
