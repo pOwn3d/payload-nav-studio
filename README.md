@@ -59,9 +59,13 @@
 
 ### Screenshots
 
-| Sidebar | Nav Customizer |
+| Nav Customizer | Drag & Drop |
 |:---:|:---:|
-| ![Sidebar](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/sidebar.png) | ![Nav Customizer](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/nav-customizer.png) |
+| ![Nav Customizer](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/nav-customizer.png) | ![Drag & Drop](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/drag-drop.png) |
+
+| Item Editor (with sub-menus) | Group Editor |
+|:---:|:---:|
+| ![Item Editor](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/item-editor.png) | ![Group Editor](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/group-editor.png) |
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
