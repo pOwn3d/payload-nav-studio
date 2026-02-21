@@ -1,5 +1,6 @@
 // Server-side exports — plugin, types, collection, icons, utils
 export { adminNavPlugin } from './plugin.js'
+export { autoDiscoverNav } from './autoDiscover.js'
 export { createAdminNavPreferencesCollection } from './collections/AdminNavPreferences.js'
 export {
   createGetPreferencesHandler,
