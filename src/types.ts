@@ -1,11 +1,14 @@
+/** Localizable string — plain string or per-language record */
+export type LocalizedString = string | Record<string, string>
+
 /** A single navigation item */
 export interface NavItemConfig {
   /** Unique item ID (e.g. 'pages', 'posts', 'seo-dashboard') */
   id: string
   /** Admin URL path (e.g. '/admin/collections/pages') */
   href: string
-  /** Display label */
-  label: string
+  /** Display label (string or { fr: '...', en: '...' }) */
+  label: LocalizedString
   /** Icon name from the built-in icon registry */
   icon: string
   /** If true, pathname.startsWith(href) activates the item */
@@ -20,8 +23,8 @@ export interface NavItemConfig {
 export interface NavGroupConfig {
   /** Unique group ID */
   id: string
-  /** Group title displayed as section header */
-  title: string
+  /** Group title displayed as section header (string or { fr: '...', en: '...' }) */
+  title: LocalizedString
   /** Items in this group */
   items: NavItemConfig[]
   /** Whether this group is visible (default: true) */

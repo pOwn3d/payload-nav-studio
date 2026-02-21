@@ -7,6 +7,7 @@
  * - Show/hide items, create custom groups, edit labels/icons
  * - API endpoints for preferences CRUD
  * - Admin view at /admin/nav-customizer
+ * - i18n support (FR/EN, extensible)
  *
  * Usage:
  *   import { adminNavPlugin } from '@consilioweb/admin-nav'
@@ -23,6 +24,7 @@
  */
 
 import type { Config, Plugin } from 'payload'
+import { deepMergeSimple } from 'payload/shared'
 import type { AdminNavPluginConfig } from './types.js'
 import { createAdminNavPreferencesCollection } from './collections/AdminNavPreferences.js'
 import {
@@ -30,6 +32,7 @@ import {
   createSavePreferencesHandler,
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
+import { translations } from './translations/index.js'
 
 export const adminNavPlugin =
   (pluginConfig: AdminNavPluginConfig): Plugin =>
@@ -40,13 +43,19 @@ export const adminNavPlugin =
     const userCollectionSlug = pluginConfig.userCollectionSlug ?? 'users'
     const basePath = pluginConfig.endpointBasePath ?? '/admin-nav'
 
-    // 1. Add the preferences collection
+    // 1. Merge i18n translations
+    config.i18n = {
+      ...config.i18n,
+      translations: deepMergeSimple(translations, config.i18n?.translations ?? {}),
+    }
+
+    // 2. Add the preferences collection
     config.collections = [
       ...(config.collections || []),
       createAdminNavPreferencesCollection(collectionSlug, userCollectionSlug),
     ]
 
-    // 2. Add API endpoints
+    // 3. Add API endpoints
     config.endpoints = [
       ...(config.endpoints || []),
       {
@@ -66,7 +75,7 @@ export const adminNavPlugin =
       },
     ]
 
-    // 3. Inject AdminNav into beforeNavLinks
+    // 4. Inject AdminNav into beforeNavLinks
     if (!config.admin) config.admin = {}
     if (!config.admin.components) config.admin.components = {}
 
@@ -88,7 +97,7 @@ export const adminNavPlugin =
       ]
     }
 
-    // 4. Add the customizer admin view
+    // 5. Add the customizer admin view
     if (pluginConfig.addCustomizerView !== false) {
       if (!config.admin.components.views) config.admin.components.views = {}
       ;(config.admin.components.views as Record<string, unknown>)['nav-customizer'] = {
@@ -97,7 +106,7 @@ export const adminNavPlugin =
       }
     }
 
-    // 5. Store plugin config as a global for the client to read
+    // 6. Store plugin config as a global for the client to read
     // We inject it via a custom endpoint that returns the default nav
     config.endpoints = [
       ...(config.endpoints || []),

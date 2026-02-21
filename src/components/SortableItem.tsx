@@ -4,7 +4,9 @@ import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { getIconPath } from '../icons.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavItemConfig } from '../types.js'
+import { resolveLabel } from '../utils.js'
 
 interface SortableItemProps {
   item: NavItemConfig
@@ -32,6 +34,7 @@ export const SortableItem: React.FC<SortableItemProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { t, i18n } = usePluginTranslation()
   const {
     attributes,
     listeners,
@@ -43,6 +46,8 @@ export const SortableItem: React.FC<SortableItemProps> = ({
     id: `item-${groupId}-${item.id}`,
     data: { groupId, item },
   })
+
+  const resolvedLabel = resolveLabel(item.label, i18n.language, i18n.fallbackLanguage as string)
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -97,7 +102,7 @@ export const SortableItem: React.FC<SortableItemProps> = ({
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
       }}>
-        {item.label}
+        {resolvedLabel}
       </span>
 
       {/* Children count badge */}
@@ -114,7 +119,7 @@ export const SortableItem: React.FC<SortableItemProps> = ({
       )}
 
       {/* Action buttons */}
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupId, item.id) }} title={item.visible === false ? 'Afficher' : 'Masquer'}>
+      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupId, item.id) }} title={item.visible === false ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}>
         {item.visible === false ? (
           <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M1 1l22 22" />
@@ -125,12 +130,12 @@ export const SortableItem: React.FC<SortableItemProps> = ({
           </svg>
         )}
       </button>
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(item, groupId) }} title="Modifier">
+      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(item, groupId) }} title={t('plugin-admin-nav:edit')}>
         <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
         </svg>
       </button>
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(groupId, item.id) }} title="Supprimer">
+      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(groupId, item.id) }} title={t('plugin-admin-nav:delete')}>
         <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 6L6 18" /><path d="M6 6l12 12" />
         </svg>

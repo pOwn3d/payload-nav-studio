@@ -3,7 +3,9 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig } from '../types.js'
+import { resolveLabel } from '../utils.js'
 
 interface SortableGroupProps {
   group: NavGroupConfig
@@ -20,6 +22,7 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { t, i18n } = usePluginTranslation()
   const {
     attributes,
     listeners,
@@ -30,6 +33,8 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
   } = useSortable({
     id: `group-${group.id}`,
   })
+
+  const resolvedTitle = resolveLabel(group.title, i18n.language, i18n.fallbackLanguage as string)
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -81,14 +86,14 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
           color: group.visible === false ? 'var(--theme-elevation-400)' : 'var(--theme-text)',
           textDecoration: group.visible === false ? 'line-through' : 'none',
         }}>
-          {group.title}
+          {resolvedTitle}
         </span>
 
         {/* Action buttons */}
         <button
           style={btnStyle}
           onClick={(e) => { e.stopPropagation(); onToggleVisibility(group.id) }}
-          title={group.visible === false ? 'Afficher' : 'Masquer'}
+          title={group.visible === false ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}
         >
           {group.visible === false ? (
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -100,12 +105,12 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
             </svg>
           )}
         </button>
-        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(group) }} title="Modifier">
+        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(group) }} title={t('plugin-admin-nav:edit')}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="M15 5l4 4" />
           </svg>
         </button>
-        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(group.id) }} title="Supprimer">
+        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(group.id) }} title={t('plugin-admin-nav:delete')}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
           </svg>

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { getIconNames, getIconPath } from '../icons.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 
 interface IconPickerProps {
   value: string
@@ -43,6 +44,7 @@ const IconButton: React.FC<{
 }
 
 export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose }) => {
+  const { t } = usePluginTranslation()
   const [search, setSearch] = useState('')
   const allIcons = useMemo(() => getIconNames(), [])
 
@@ -71,7 +73,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
       <div style={{ padding: 8, borderBottom: '1px solid var(--theme-elevation-200)' }}>
         <input
           type="text"
-          placeholder="Rechercher une icône..."
+          placeholder={t('plugin-admin-nav:searchIcon')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
@@ -91,7 +93,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
       {/* Color dot option */}
       <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--theme-elevation-200)' }}>
         <label style={{ fontSize: 11, color: 'var(--theme-elevation-500)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          Couleur dot:
+          {t('plugin-admin-nav:dotColor')}
           <input
             type="color"
             value={value.startsWith('#') ? value : '#00E5FF'}
@@ -120,7 +122,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
         ))}
         {filtered.length === 0 && (
           <div style={{ padding: 12, fontSize: 12, color: 'var(--theme-elevation-400)' }}>
-            Aucune icône trouvée
+            {t('plugin-admin-nav:noIconFound')}
           </div>
         )}
       </div>
@@ -138,7 +140,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
             padding: '4px 8px',
           }}
         >
-          Fermer
+          {t('plugin-admin-nav:close')}
         </button>
       </div>
     </div>

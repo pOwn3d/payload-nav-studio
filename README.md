@@ -2,7 +2,7 @@
 <div align="center">
 
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fadmin-nav;Payload+CMS+Sidebar+Plugin;Drag+%26+Drop+%7C+Per-User+Prefs;70%2B+Icons+%7C+Fully+Customizable" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fadmin-nav;Payload+CMS+Sidebar+Plugin;Drag+%26+Drop+%7C+Per-User+Prefs;70%2B+Icons+%7C+i18n+Ready" alt="Typing SVG" />
   </a>
 
   <br><br>
@@ -13,6 +13,7 @@
   <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
   <img src="https://img.shields.io/badge/Drag%20%26%20Drop-dnd--kit-8B5CF6?style=for-the-badge" alt="dnd-kit">
   <img src="https://img.shields.io/badge/Icons-70%2B%20SVG-10B981?style=for-the-badge" alt="70+ Icons">
+  <img src="https://img.shields.io/badge/i18n-FR%20%7C%20EN-F59E0B?style=for-the-badge&logo=translate&logoColor=white" alt="i18n FR | EN">
   <a href="https://github.com/pOwn3d/payload-nav-studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-7C3AED?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
   <a href="https://github.com/pOwn3d/payload-nav-studio/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/pOwn3d/payload-nav-studio/ci.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white" alt="CI"></a>
@@ -24,7 +25,7 @@
 
 ## About
 
-> **@consilioweb/admin-nav** — A fully customizable admin sidebar navigation plugin for Payload CMS 3. Drag & drop reordering, per-user preferences stored in the database, 70+ built-in SVG icons, nested sub-items, and a dedicated admin view to customize everything visually.
+> **@consilioweb/admin-nav** — A fully customizable admin sidebar navigation plugin for Payload CMS 3. Drag & drop reordering, per-user preferences stored in the database, 70+ built-in SVG icons, nested sub-items, i18n support (FR/EN with multi-language labels), and a dedicated admin view to customize everything visually.
 
 <table>
   <tr>
@@ -48,6 +49,19 @@
       <b>REST API</b><br>
       <sub>Preferences CRUD</sub>
     </td>
+  </tr>
+  <tr>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/language.png" width="50"/><br>
+      <b>i18n Ready</b><br>
+      <sub>FR & EN out of the box</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/translate-text.png" width="50"/><br>
+      <b>Multi-lang Labels</b><br>
+      <sub>Per-language nav labels</sub>
+    </td>
+    <td align="center" colspan="2"></td>
   </tr>
 </table>
 
@@ -75,6 +89,7 @@
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [Internationalization (i18n)](#internationalization-i18n)
 - [Built-in Icons](#built-in-icons)
 - [API Endpoints](#api-endpoints)
 - [Components](#components)
@@ -126,6 +141,15 @@ Inline SVG icons (Lucide-compatible, 24x24 viewBox) — zero external dependenci
 - **SEO** — search, trending-up, bar-chart, link, award
 - **Misc** — heart, star, bell, zap, gift, rocket, and many more
 
+### Internationalization (i18n)
+
+- **UI translations** — all plugin strings are translated (French & English included)
+- **Multi-language labels** — nav item labels and group titles support `string | Record<string, string>`
+- **Toggle in editor** — switch between single-language and multi-language mode per item
+- **Auto-detection** — existing `Record<string, string>` labels open in multi-lang mode automatically
+- **Fallback chain** — resolves: exact language → fallback language → first available value
+- **Extensible** — follows Payload's `deepMergeSimple` pattern, so you can override any translation key
+
 ### Admin View
 
 The plugin adds a dedicated view at `/admin/nav-customizer` with:
@@ -161,6 +185,7 @@ yarn add @consilioweb/admin-nav
 | `payload` | `^3.0.0` | **Yes** |
 | `@payloadcms/next` | `^3.0.0` | Optional (admin views) |
 | `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
+| `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
 | `next` | `^14.0.0 \|\| ^15.0.0` | Optional (admin UI) |
 | `react` | `^18.0.0 \|\| ^19.0.0` | Optional (admin UI) |
 | `react-dom` | `^18.0.0 \|\| ^19.0.0` | Optional (admin UI) |
@@ -242,15 +267,23 @@ adminNavPlugin({
 
 ### Types
 
+#### `LocalizedString`
+
+```ts
+type LocalizedString = string | Record<string, string>
+```
+
+Labels and titles accept either a plain string or a per-language record. Both are fully backward-compatible.
+
 #### `NavGroupConfig`
 
 ```ts
 interface NavGroupConfig {
-  id: string              // Unique group ID
-  title: string           // Section header label
-  items: NavItemConfig[]  // Items in this group
-  visible?: boolean       // Whether the group is visible (default: true)
-  defaultCollapsed?: boolean // Start collapsed (default: false)
+  id: string                   // Unique group ID
+  title: LocalizedString       // Section header label (string or per-language)
+  items: NavItemConfig[]       // Items in this group
+  visible?: boolean            // Whether the group is visible (default: true)
+  defaultCollapsed?: boolean   // Start collapsed (default: false)
 }
 ```
 
@@ -260,7 +293,7 @@ interface NavGroupConfig {
 interface NavItemConfig {
   id: string                   // Unique item ID
   href: string                 // Admin URL path
-  label: string                // Display label
+  label: LocalizedString       // Display label (string or per-language)
   icon: string                 // Icon name or '#RRGGBB' for color dot
   matchPrefix?: boolean        // Activate on pathname.startsWith(href)
   children?: NavItemConfig[]   // Nested sub-items
@@ -284,16 +317,16 @@ adminNavPlugin({
   defaultNav: [
     {
       id: 'content',
-      title: 'Content',
+      title: { fr: 'Contenu', en: 'Content' },  // Multi-language group title
       items: [
         { id: 'pages', href: '/admin/collections/pages', label: 'Pages', icon: 'file-text' },
-        { id: 'posts', href: '/admin/collections/posts', label: 'Blog', icon: 'newspaper' },
-        { id: 'media', href: '/admin/collections/media', label: 'Media', icon: 'image' },
+        { id: 'posts', href: '/admin/collections/posts', label: { fr: 'Articles', en: 'Blog' }, icon: 'newspaper' },
+        { id: 'media', href: '/admin/collections/media', label: { fr: 'Médias', en: 'Media' }, icon: 'image' },
       ],
     },
     {
       id: 'seo',
-      title: 'SEO',
+      title: 'SEO',  // Plain string still works
       defaultCollapsed: true,
       items: [
         { id: 'seo-dashboard', href: '/admin/seo', label: 'Dashboard', icon: 'trending-up', matchPrefix: true },
@@ -330,6 +363,100 @@ adminNavPlugin({
   // For file: or link: protocol installs, override the component path:
   // navComponentPath: '@/components/admin/AdminNavWrapper#AdminNav',
 })
+```
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Internationalization (i18n)
+
+### Plugin UI Translations
+
+The plugin ships with French and English translations for all UI strings (buttons, labels, toasts, confirmations, etc.). Translations are automatically merged into Payload's i18n system using `deepMergeSimple`.
+
+All keys are namespaced under `plugin-admin-nav`:
+
+```ts
+t('plugin-admin-nav:save')      // "Sauvegarder" (FR) / "Save" (EN)
+t('plugin-admin-nav:editItem')  // "Modifier l'item" (FR) / "Edit item" (EN)
+```
+
+To override or add a language, merge your translations in `payload.config.ts`:
+
+```ts
+import { buildConfig } from 'payload'
+
+export default buildConfig({
+  i18n: {
+    translations: {
+      de: {
+        'plugin-admin-nav': {
+          save: 'Speichern',
+          cancel: 'Abbrechen',
+          // ... override any key
+        },
+      },
+    },
+  },
+})
+```
+
+### Multi-Language Nav Labels
+
+Item labels and group titles accept `string | Record<string, string>`:
+
+```ts
+adminNavPlugin({
+  defaultNav: [
+    {
+      id: 'content',
+      title: { fr: 'Contenu', en: 'Content' },  // Multi-language title
+      items: [
+        {
+          id: 'pages',
+          href: '/admin/collections/pages',
+          label: { fr: 'Pages', en: 'Pages' },   // Multi-language label
+          icon: 'file-text',
+        },
+        {
+          id: 'posts',
+          href: '/admin/collections/posts',
+          label: 'Blog',                           // Simple string still works
+          icon: 'newspaper',
+        },
+      ],
+    },
+  ],
+})
+```
+
+The item and group editors include a **Multi-lang** toggle that lets users switch between single-language and multi-language mode. When a label is already a `Record<string, string>`, the editor opens in multi-lang mode automatically.
+
+### Utilities
+
+```ts
+import { resolveLabel, isMultiLang } from '@consilioweb/admin-nav'
+
+// Resolve a label to the current language
+resolveLabel({ fr: 'Pages', en: 'Pages' }, 'fr')        // 'Pages'
+resolveLabel({ fr: 'Contenu', en: 'Content' }, 'en')    // 'Content'
+resolveLabel('Simple string', 'fr')                       // 'Simple string'
+
+// Type guard
+isMultiLang({ fr: 'Oui', en: 'Yes' })  // true
+isMultiLang('plain')                     // false
+```
+
+### `usePluginTranslation` Hook
+
+Type-safe wrapper around Payload's `useTranslation` that accepts plugin custom keys:
+
+```ts
+import { usePluginTranslation } from '@consilioweb/admin-nav/client'
+
+function MyComponent() {
+  const { t, i18n } = usePluginTranslation()
+  return <span>{t('plugin-admin-nav:save')}</span>
+}
 ```
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
@@ -431,15 +558,17 @@ function MyComponent() {
 
 ### Client Components
 
-| Component | Description |
-|-----------|-------------|
+| Component / Hook | Description |
+|------------------|-------------|
 | `AdminNav` | Main sidebar navigation component (injected via `beforeNavLinks`) |
 | `NavCustomizer` | Full drag & drop editor for the navigation layout |
 | `SortableGroup` | Draggable group component (used by NavCustomizer) |
 | `SortableItem` | Draggable item component (used by NavCustomizer) |
-| `GroupEditor` | Modal for editing group properties |
-| `NavItemEditor` | Modal for editing item properties and sub-items |
+| `GroupEditor` | Modal for editing group properties (with multi-lang toggle) |
+| `NavItemEditor` | Modal for editing item properties, sub-items, and multi-lang labels |
 | `IconPicker` | Icon selection dropdown with search and color mode |
+| `useNavPreferences` | Hook for reading/saving nav preferences |
+| `usePluginTranslation` | Type-safe i18n hook with plugin translation keys |
 
 ### Server Views
 
@@ -452,7 +581,7 @@ function MyComponent() {
 ## Package Exports
 
 ```ts
-// Main entry — plugin, collection, endpoints, icons, types
+// Main entry — plugin, collection, endpoints, icons, types, i18n utilities
 import {
   adminNavPlugin,
   createAdminNavPreferencesCollection,
@@ -462,12 +591,15 @@ import {
   getIconNames,
   getIconPath,
   iconPaths,
+  resolveLabel,
+  isMultiLang,
 } from '@consilioweb/admin-nav'
 import type {
   NavItemConfig,
   NavGroupConfig,
   NavLayout,
   AdminNavPluginConfig,
+  LocalizedString,
 } from '@consilioweb/admin-nav'
 
 // Client components — React components for Payload admin UI
@@ -480,7 +612,11 @@ import {
   NavItemEditor,
   IconPicker,
   useNavPreferences,
+  usePluginTranslation,
+  resolveLabel,
+  isMultiLang,
 } from '@consilioweb/admin-nav/client'
+import type { PluginAdminNavTranslationKeys } from '@consilioweb/admin-nav/client'
 
 // Server views — admin views wrapped in DefaultTemplate
 import { NavCustomizerView } from '@consilioweb/admin-nav/views'

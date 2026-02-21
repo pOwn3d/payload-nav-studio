@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import type { NavGroupConfig } from '../types.js'
+import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
+import type { NavGroupConfig, LocalizedString } from '../types.js'
+import { isMultiLang, resolveLabel } from '../utils.js'
 
 interface GroupEditorProps {
   group?: NavGroupConfig
@@ -29,23 +31,68 @@ const labelStyle: React.CSSProperties = {
 }
 
 export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCancel }) => {
+  const { t, i18n } = usePluginTranslation()
   const isNew = !group
-  const [title, setTitle] = useState(group?.title || '')
+
+  // Multi-lang state
+  const [useMultiLang, setUseMultiLang] = useState(() => group ? isMultiLang(group.title) : false)
+
+  // Simple string title
+  const [title, setTitle] = useState(() => {
+    if (!group) return ''
+    return resolveLabel(group.title, i18n.language, i18n.fallbackLanguage as string)
+  })
+
+  // Multi-lang title record
+  const [titleRecord, setTitleRecord] = useState<Record<string, string>>(() => {
+    if (group && isMultiLang(group.title)) return { ...group.title }
+    const fallback = group ? resolveLabel(group.title, i18n.language, i18n.fallbackLanguage as string) : ''
+    return { [i18n.language]: fallback }
+  })
+
   const [id, setId] = useState(group?.id || '')
   const [defaultCollapsed, setDefaultCollapsed] = useState(group?.defaultCollapsed ?? false)
 
+  const getResolvedTitle = (): string => {
+    if (useMultiLang) {
+      return titleRecord[i18n.language] || Object.values(titleRecord).find(Boolean) || ''
+    }
+    return title
+  }
+
+  const getFinalTitle = (): LocalizedString => {
+    if (useMultiLang) {
+      // Filter empty values
+      const filtered: Record<string, string> = {}
+      for (const [k, v] of Object.entries(titleRecord)) {
+        if (v.trim()) filtered[k] = v.trim()
+      }
+      return Object.keys(filtered).length > 0 ? filtered : ''
+    }
+    return title.trim()
+  }
+
   const handleSave = () => {
-    const groupId = id.trim() || title.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    if (!title.trim() || !groupId) return
+    const finalTitle = getFinalTitle()
+    const resolvedForId = typeof finalTitle === 'string' ? finalTitle : getResolvedTitle()
+    const groupId = id.trim() || resolvedForId.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    if (!resolvedForId || !groupId) return
 
     onSave({
       id: groupId,
-      title: title.trim(),
+      title: finalTitle,
       items: group?.items || [],
       visible: group?.visible ?? true,
       defaultCollapsed,
     })
   }
+
+  const resolvedTitle = getResolvedTitle()
+
+  // Available languages from Payload i18n
+  const availableLangs = Object.keys(
+    (i18n as unknown as { translations?: Record<string, unknown> }).translations || { [i18n.language]: true },
+  )
 
   return (
     <div
@@ -70,38 +117,81 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
           padding: 24,
           width: 380,
           maxWidth: '90vw',
+          maxHeight: '85vh',
+          overflowY: 'auto',
           boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--theme-text)' }}>
-          {isNew ? 'Nouveau groupe' : 'Modifier le groupe'}
+          {isNew ? t('plugin-admin-nav:newGroup') : t('plugin-admin-nav:editGroup')}
         </h3>
 
         {/* Title */}
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Titre</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              if (isNew) setId(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))
-            }}
-            placeholder="ex: Mon groupe"
-            autoFocus
-            style={fieldStyle}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label style={{ ...labelStyle, marginBottom: 0 }}>{t('plugin-admin-nav:titleField')}</label>
+            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--theme-elevation-500)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={useMultiLang}
+                onChange={(e) => {
+                  setUseMultiLang(e.target.checked)
+                  if (e.target.checked && title.trim()) {
+                    setTitleRecord((prev) => ({ ...prev, [i18n.language]: title.trim() }))
+                  } else if (!e.target.checked) {
+                    setTitle(getResolvedTitle())
+                  }
+                }}
+              />
+              {t('plugin-admin-nav:multiLang')}
+            </label>
+          </div>
+
+          {useMultiLang ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {availableLangs.map((lang) => (
+                <div key={lang} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--theme-elevation-400)', width: 20, textAlign: 'center', textTransform: 'uppercase' }}>{lang}</span>
+                  <input
+                    type="text"
+                    value={titleRecord[lang] || ''}
+                    onChange={(e) => {
+                      setTitleRecord((prev) => ({ ...prev, [lang]: e.target.value }))
+                      if (isNew && lang === i18n.language) {
+                        setId(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))
+                      }
+                    }}
+                    placeholder={t('plugin-admin-nav:titlePlaceholder')}
+                    autoFocus={lang === i18n.language}
+                    style={fieldStyle}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                if (isNew) setId(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))
+              }}
+              placeholder={t('plugin-admin-nav:titlePlaceholder')}
+              autoFocus
+              style={fieldStyle}
+            />
+          )}
         </div>
 
         {/* ID */}
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>ID (unique)</label>
+          <label style={labelStyle}>{t('plugin-admin-nav:idField')}</label>
           <input
             type="text"
             value={id}
             onChange={(e) => setId(e.target.value)}
-            placeholder="ex: mon-groupe"
+            placeholder={t('plugin-admin-nav:idPlaceholder')}
             style={fieldStyle}
             disabled={!isNew}
           />
@@ -115,7 +205,7 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
               checked={defaultCollapsed}
               onChange={(e) => setDefaultCollapsed(e.target.checked)}
             />
-            Replié par défaut
+            {t('plugin-admin-nav:defaultCollapsed')}
           </label>
         </div>
 
@@ -133,23 +223,23 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
               color: 'var(--theme-text)',
             }}
           >
-            Annuler
+            {t('plugin-admin-nav:cancel')}
           </button>
           <button
             onClick={handleSave}
-            disabled={!title.trim()}
+            disabled={!resolvedTitle.trim()}
             style={{
               padding: '8px 16px',
               border: 'none',
               borderRadius: 6,
-              backgroundColor: title.trim() ? 'var(--theme-success-500)' : 'var(--theme-elevation-300)',
+              backgroundColor: resolvedTitle.trim() ? 'var(--theme-success-500)' : 'var(--theme-elevation-300)',
               color: 'white',
               fontSize: 13,
               fontWeight: 600,
-              cursor: title.trim() ? 'pointer' : 'not-allowed',
+              cursor: resolvedTitle.trim() ? 'pointer' : 'not-allowed',
             }}
           >
-            {isNew ? 'Créer' : 'Sauvegarder'}
+            {isNew ? t('plugin-admin-nav:create') : t('plugin-admin-nav:save')}
           </button>
         </div>
       </div>
