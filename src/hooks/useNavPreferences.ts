@@ -65,15 +65,17 @@ function clearCache(): void {
  *
  * Uses sessionStorage to cache the layout, so navigation between pages
  * is instant (no loading flash). Syncs with the server in the background.
+ *
+ * Cache is read inside useEffect (not useState) to avoid React hydration
+ * mismatch — sessionStorage is only available on the client.
  */
 export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPreferencesReturn {
-  // Initialize from cache if available (instant render, no flash)
-  const cached = useRef(readCache())
-  const [layout, setLayout] = useState<NavGroupConfig[]>(cached.current?.layout ?? [])
-  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>(cached.current?.defaultNav ?? [])
-  const [isLoaded, setIsLoaded] = useState(!!cached.current)
+  // Always start with empty state (matches server render — avoids hydration error #418)
+  const [layout, setLayout] = useState<NavGroupConfig[]>([])
+  const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [isCustom, setIsCustom] = useState(cached.current?.isCustom ?? false)
+  const [isCustom, setIsCustom] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const loadPreferences = useCallback(async () => {
@@ -127,7 +129,16 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   }, [basePath])
 
   useEffect(() => {
-    // Always fetch in background (even if cached) to stay in sync
+    // Read from cache first for instant display (client-only, post-hydration)
+    const cached = readCache()
+    if (cached) {
+      setLayout(cached.layout)
+      setDefaultNav(cached.defaultNav)
+      setIsCustom(cached.isCustom)
+      setIsLoaded(true)
+    }
+
+    // Always fetch in background to stay in sync with server
     loadPreferences()
     return () => { abortRef.current?.abort() }
   }, [loadPreferences])
