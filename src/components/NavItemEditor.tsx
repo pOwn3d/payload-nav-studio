@@ -67,10 +67,9 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
     return label.trim()
   }
 
-  // Available languages from Payload i18n
-  const availableLangs = Object.keys(
-    (i18n as unknown as { translations?: Record<string, unknown> }).translations || { [i18n.language]: true },
-  )
+  // Available languages from Payload i18n (i18next exposes .languages at runtime)
+  const i18nLanguages = (i18n as unknown as { languages?: string[] }).languages
+  const availableLangs = i18nLanguages?.filter((l) => l !== 'cimode') || [i18n.language]
 
   const handleSave = () => {
     const finalLabel = getFinalLabel()
