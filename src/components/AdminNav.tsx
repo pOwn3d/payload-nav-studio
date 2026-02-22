@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavPreferences } from '../hooks/useNavPreferences.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import { getIconPath } from '../icons.js'
@@ -33,25 +35,6 @@ const NavIcon: React.FC<{ name: string; size?: number }> = ({ name, size = 16 })
       ))}
     </svg>
   )
-}
-
-/** Hook to get the current URL (pathname + search) */
-function useFullUrl(): string {
-  const [fullUrl, setFullUrl] = useState('')
-  React.useEffect(() => {
-    const update = () => setFullUrl(window.location.pathname + window.location.search)
-    update()
-    // Listen for popstate (back/forward) and custom nav events
-    window.addEventListener('popstate', update)
-    // MutationObserver on body to catch SPA navigations
-    const observer = new MutationObserver(update)
-    observer.observe(document.body, { childList: true, subtree: true })
-    return () => {
-      window.removeEventListener('popstate', update)
-      observer.disconnect()
-    }
-  }, [])
-  return fullUrl
 }
 
 /** Check if a nav item is active based on the current URL */
@@ -178,8 +161,12 @@ const ChildIcon: React.FC<{ icon: string }> = ({ icon }) => {
 const AdminNav: React.FC = () => {
   const { t, i18n } = usePluginTranslation()
   const { layout, isLoaded } = useNavPreferences()
-  const fullUrl = useFullUrl()
-  const pathname = fullUrl.split('?')[0]
+
+  // Next.js reactive hooks — update instantly on client-side navigation
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const search = searchParams?.toString() ? `?${searchParams.toString()}` : ''
+  const fullUrl = pathname + search
 
   const isDashboard = pathname === '/admin' || pathname === '/admin/'
 
@@ -221,10 +208,10 @@ const AdminNav: React.FC = () => {
       minHeight: isLoaded ? undefined : 200,
     }}>
       {/* Dashboard link */}
-      <a href="/admin" style={styles.dashboardLink(isDashboard)}>
+      <Link href="/admin" prefetch={false} style={styles.dashboardLink(isDashboard)}>
         <NavIcon name="home" />
         {t('plugin-admin-nav:dashboard')}
-      </a>
+      </Link>
 
       {visibleGroups.map((group) => {
         const isCollapsed = collapsed[group.id]
@@ -269,19 +256,19 @@ const AdminNav: React.FC = () => {
 
               return (
                 <React.Fragment key={item.id}>
-                  <a href={item.href} style={styles.itemLink(isActive, hasActiveChild)}>
+                  <Link href={item.href} prefetch={false} style={styles.itemLink(isActive, hasActiveChild)}>
                     <NavIcon name={item.icon} />
                     {resolveLabel(item.label, lang, fallbackLang)}
-                  </a>
+                  </Link>
 
                   {/* Child items */}
                   {item.children?.filter((c) => c.visible !== false).map((child) => {
                     const isChildActive = fullUrl === child.href
                     return (
-                      <a key={child.id} href={child.href} style={styles.childLink(isChildActive)}>
+                      <Link key={child.id} href={child.href} prefetch={false} style={styles.childLink(isChildActive)}>
                         <ChildIcon icon={child.icon} />
                         {resolveLabel(child.label, lang, fallbackLang)}
-                      </a>
+                      </Link>
                     )
                   })}
                 </React.Fragment>
@@ -292,10 +279,10 @@ const AdminNav: React.FC = () => {
       })}
 
       {/* Customize button */}
-      <a href="/admin/nav-customizer" style={styles.customizeLink}>
+      <Link href="/admin/nav-customizer" prefetch={false} style={styles.customizeLink}>
         <NavIcon name="settings" size={12} />
         {t('plugin-admin-nav:customize')}
-      </a>
+      </Link>
     </div>
   )
 }
