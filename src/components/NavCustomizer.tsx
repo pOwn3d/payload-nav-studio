@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useId } from 'react'
+import React, { useState, useCallback, useId, useEffect, useRef, useMemo } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -27,6 +27,10 @@ import { NavItemEditor } from './NavItemEditor.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig, NavItemConfig } from '../types.js'
 import { resolveLabel } from '../utils.js'
+
+// ── Constants ──
+
+const MAX_UNDO_STACK = 20
 
 // ── Styles ──
 
@@ -84,6 +88,49 @@ const btnOutline: React.CSSProperties = {
   textAlign: 'center' as const,
 }
 
+const btnSmall: React.CSSProperties = {
+  padding: '5px 10px',
+  border: '1px solid var(--theme-elevation-200)',
+  borderRadius: 5,
+  background: 'none',
+  fontSize: 11,
+  cursor: 'pointer',
+  color: 'var(--theme-elevation-600)',
+  whiteSpace: 'nowrap' as const,
+}
+
+const btnSmallDisabled: React.CSSProperties = {
+  ...btnSmall,
+  opacity: 0.4,
+  cursor: 'default',
+}
+
+const toolbarStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: 6,
+  marginBottom: 16,
+  alignItems: 'center',
+}
+
+const searchContainerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  marginBottom: 16,
+}
+
+const searchInputStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '7px 12px',
+  border: '1px solid var(--theme-elevation-200)',
+  borderRadius: 6,
+  fontSize: 13,
+  color: 'var(--theme-text)',
+  backgroundColor: 'var(--theme-input-bg, transparent)',
+  outline: 'none',
+}
+
 const toastStyle = (visible: boolean, isError: boolean): React.CSSProperties => ({
   position: 'fixed',
   bottom: 24,
@@ -102,10 +149,39 @@ const toastStyle = (visible: boolean, isError: boolean): React.CSSProperties => 
   pointerEvents: 'none' as const,
 })
 
+// ── Helpers ──
+
+/** Deep clone a NavGroupConfig array */
+function cloneGroups(groups: NavGroupConfig[]): NavGroupConfig[] {
+  return JSON.parse(JSON.stringify(groups))
+}
+
+/** Validate that a JSON value looks like a valid NavGroupConfig[] */
+function isValidNavConfig(data: unknown): data is NavGroupConfig[] {
+  if (!Array.isArray(data)) return false
+  return data.every(
+    (g) =>
+      typeof g === 'object' &&
+      g !== null &&
+      typeof g.id === 'string' &&
+      g.title !== undefined &&
+      Array.isArray(g.items) &&
+      g.items.every(
+        (i: unknown) =>
+          typeof i === 'object' &&
+          i !== null &&
+          typeof (i as NavItemConfig).id === 'string' &&
+          typeof (i as NavItemConfig).href === 'string' &&
+          (i as NavItemConfig).label !== undefined,
+      ),
+  )
+}
+
 /**
  * NavCustomizer — Full drag & drop navigation editor.
  * Allows reordering groups and items, toggling visibility,
  * editing labels/icons/URLs, creating new groups/items.
+ * Features: undo/redo, search/filter, import/export, bulk show/hide.
  */
 export const NavCustomizer: React.FC = () => {
   const { t, i18n } = usePluginTranslation()
@@ -133,10 +209,113 @@ export const NavCustomizer: React.FC = () => {
   const [activeId, setActiveId] = useState<string | null>(null)
   const dndId = useId()
 
+  // ── Feature 1: Undo/Redo Stack ──
+  const [undoStack, setUndoStack] = useState<NavGroupConfig[][]>([])
+  const [redoStack, setRedoStack] = useState<NavGroupConfig[][]>([])
+
+  /** Push current state onto the undo stack before a change */
+  const pushUndo = useCallback((currentGroups: NavGroupConfig[]) => {
+    setUndoStack((prev) => {
+      const next = [...prev, cloneGroups(currentGroups)]
+      if (next.length > MAX_UNDO_STACK) next.shift()
+      return next
+    })
+    // Any new action clears the redo stack
+    setRedoStack([])
+  }, [])
+
+  /** Wrapper around setGroups that also pushes to undo */
+  const setGroupsWithUndo = useCallback(
+    (updater: NavGroupConfig[] | ((prev: NavGroupConfig[]) => NavGroupConfig[])) => {
+      setGroups((prev) => {
+        pushUndo(prev)
+        return typeof updater === 'function' ? updater(prev) : updater
+      })
+    },
+    [pushUndo],
+  )
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return
+    setUndoStack((prev) => {
+      const newStack = [...prev]
+      const snapshot = newStack.pop()!
+      setRedoStack((r) => {
+        const newRedo = [...r]
+        // Push current groups to redo before restoring
+        setGroups((currentGroups) => {
+          newRedo.push(cloneGroups(currentGroups))
+          return snapshot
+        })
+        if (newRedo.length > MAX_UNDO_STACK) newRedo.shift()
+        return newRedo
+      })
+      return newStack
+    })
+  }, [undoStack.length])
+
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0) return
+    setRedoStack((prev) => {
+      const newStack = [...prev]
+      const snapshot = newStack.pop()!
+      setUndoStack((u) => {
+        const newUndo = [...u]
+        // Push current groups to undo before restoring
+        setGroups((currentGroups) => {
+          newUndo.push(cloneGroups(currentGroups))
+          return snapshot
+        })
+        if (newUndo.length > MAX_UNDO_STACK) newUndo.shift()
+        return newUndo
+      })
+      return newStack
+    })
+  }, [redoStack.length])
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey
+      if (!isMod || e.key.toLowerCase() !== 'z') return
+
+      e.preventDefault()
+      if (e.shiftKey) {
+        handleRedo()
+      } else {
+        handleUndo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleUndo, handleRedo])
+
+  // ── Feature 3: Search/Filter ──
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery.trim()) return groups
+    const q = searchQuery.trim().toLowerCase()
+    return groups.reduce<NavGroupConfig[]>((acc, group) => {
+      const groupTitleMatch = resolveLabel(group.title, lang, fallbackLang).toLowerCase().includes(q)
+      const matchingItems = group.items.filter((item) =>
+        resolveLabel(item.label, lang, fallbackLang).toLowerCase().includes(q),
+      )
+      // Show group if its title matches or any items match
+      if (groupTitleMatch || matchingItems.length > 0) {
+        acc.push({
+          ...group,
+          items: groupTitleMatch ? group.items : matchingItems,
+        })
+      }
+      return acc
+    }, [])
+  }, [groups, searchQuery, lang, fallbackLang])
+
   // Initialize groups from loaded layout
   React.useEffect(() => {
     if (isLoaded && layout.length > 0 && !initialized) {
-      setGroups(JSON.parse(JSON.stringify(layout)))
+      setGroups(cloneGroups(layout))
       setInitialized(true)
     }
   }, [isLoaded, layout, initialized])
@@ -145,6 +324,48 @@ export const NavCustomizer: React.FC = () => {
     setToast({ message, isError, visible: true })
     setTimeout(() => setToast((prev) => ({ ...prev, visible: false })), 2500)
   }, [])
+
+  // ── Feature 4: Import/Export ──
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleExport = useCallback(() => {
+    const data = JSON.stringify(groups, null, 2)
+    const blob = new Blob([data], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'nav-config.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [groups])
+
+  const handleImport = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+
+      const reader = new FileReader()
+      reader.onload = (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target?.result as string)
+          if (!isValidNavConfig(parsed)) {
+            showToast(t('plugin-admin-nav:importError'), true)
+            return
+          }
+          setGroupsWithUndo(parsed)
+          showToast(t('plugin-admin-nav:importSuccess'))
+        } catch {
+          showToast(t('plugin-admin-nav:importError'), true)
+        }
+        // Reset file input so same file can be re-imported
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+      reader.readAsText(file)
+    },
+    [showToast, t, setGroupsWithUndo],
+  )
 
   // ── DnD sensors & collision ──
   const sensors = useSensors(
@@ -187,7 +408,7 @@ export const NavCustomizer: React.FC = () => {
       const activeGroupId = activeStr.replace('group-', '')
       const overGroupId = overStr.replace('group-', '')
 
-      setGroups((prev) => {
+      setGroupsWithUndo((prev) => {
         const oldIndex = prev.findIndex((g) => g.id === activeGroupId)
         const newIndex = prev.findIndex((g) => g.id === overGroupId)
         if (oldIndex === -1 || newIndex === -1) return prev
@@ -210,8 +431,8 @@ export const NavCustomizer: React.FC = () => {
 
       if (!activeItemId || !overItemId) return
 
-      setGroups((prev) => {
-        const newGroups = JSON.parse(JSON.stringify(prev)) as NavGroupConfig[]
+      setGroupsWithUndo((prev) => {
+        const newGroups = cloneGroups(prev)
 
         if (fromGroupId === toGroupId) {
           // Same group reorder
@@ -238,23 +459,23 @@ export const NavCustomizer: React.FC = () => {
         return newGroups
       })
     }
-  }, [])
+  }, [setGroupsWithUndo])
 
   // ── Group actions ──
 
   const toggleGroupVisibility = useCallback((groupId: string) => {
-    setGroups((prev) => prev.map((g) =>
+    setGroupsWithUndo((prev) => prev.map((g) =>
       g.id === groupId ? { ...g, visible: g.visible === false ? true : false } : g
     ))
-  }, [])
+  }, [setGroupsWithUndo])
 
   const deleteGroup = useCallback((groupId: string) => {
     if (!window.confirm(t('plugin-admin-nav:deleteGroupConfirm'))) return
-    setGroups((prev) => prev.filter((g) => g.id !== groupId))
-  }, [t])
+    setGroupsWithUndo((prev) => prev.filter((g) => g.id !== groupId))
+  }, [t, setGroupsWithUndo])
 
   const saveEditedGroup = useCallback((group: NavGroupConfig) => {
-    setGroups((prev) => {
+    setGroupsWithUndo((prev) => {
       const exists = prev.find((g) => g.id === group.id)
       if (exists) {
         return prev.map((g) => g.id === group.id ? { ...g, title: group.title, defaultCollapsed: group.defaultCollapsed } : g)
@@ -264,12 +485,12 @@ export const NavCustomizer: React.FC = () => {
     })
     setEditingGroup(null)
     setIsCreatingGroup(false)
-  }, [])
+  }, [setGroupsWithUndo])
 
   // ── Item actions ──
 
   const toggleItemVisibility = useCallback((groupId: string, itemId: string) => {
-    setGroups((prev) => prev.map((g) => {
+    setGroupsWithUndo((prev) => prev.map((g) => {
       if (g.id !== groupId) return g
       return {
         ...g,
@@ -278,20 +499,20 @@ export const NavCustomizer: React.FC = () => {
         ),
       }
     }))
-  }, [])
+  }, [setGroupsWithUndo])
 
   const deleteItem = useCallback((groupId: string, itemId: string) => {
-    setGroups((prev) => prev.map((g) => {
+    setGroupsWithUndo((prev) => prev.map((g) => {
       if (g.id !== groupId) return g
       return { ...g, items: g.items.filter((item) => item.id !== itemId) }
     }))
-  }, [])
+  }, [setGroupsWithUndo])
 
   const saveEditedItem = useCallback((item: NavItemConfig, groupId?: string) => {
     const targetGroupId = groupId || editingItem?.groupId
     if (!targetGroupId) return
 
-    setGroups((prev) => prev.map((g) => {
+    setGroupsWithUndo((prev) => prev.map((g) => {
       if (g.id !== targetGroupId) return g
       const exists = g.items.find((i) => i.id === item.id)
       if (exists) {
@@ -302,7 +523,29 @@ export const NavCustomizer: React.FC = () => {
 
     setEditingItem(null)
     setIsCreatingItem(null)
-  }, [editingItem])
+  }, [editingItem, setGroupsWithUndo])
+
+  // ── Feature 5: Bulk Show/Hide ──
+
+  const showAll = useCallback(() => {
+    setGroupsWithUndo((prev) =>
+      prev.map((g) => ({
+        ...g,
+        visible: true,
+        items: g.items.map((item) => ({ ...item, visible: true })),
+      })),
+    )
+  }, [setGroupsWithUndo])
+
+  const hideAll = useCallback(() => {
+    setGroupsWithUndo((prev) =>
+      prev.map((g) => ({
+        ...g,
+        visible: false,
+        items: g.items.map((item) => ({ ...item, visible: false })),
+      })),
+    )
+  }, [setGroupsWithUndo])
 
   // ── Save / Reset ──
 
@@ -316,6 +559,8 @@ export const NavCustomizer: React.FC = () => {
     const success = await reset()
     if (success) {
       setInitialized(false) // Will reload from layout
+      setUndoStack([])
+      setRedoStack([])
       showToast(t('plugin-admin-nav:resetSuccess'))
     } else {
       showToast(t('plugin-admin-nav:resetError'), true)
@@ -332,7 +577,9 @@ export const NavCustomizer: React.FC = () => {
     )
   }
 
-  const groupIds = groups.map((g) => `group-${g.id}`)
+  // Use filtered groups for display, but full groups for DnD IDs and saving
+  const displayGroups = searchQuery.trim() ? filteredGroups : groups
+  const groupIds = displayGroups.map((g) => `group-${g.id}`)
 
   // Resolve the label for the drag overlay
   const getOverlayLabel = (): string => {
@@ -350,6 +597,8 @@ export const NavCustomizer: React.FC = () => {
     }
     return activeId
   }
+
+  const isSearching = searchQuery.trim().length > 0
 
   return (
     <div style={containerStyle}>
@@ -373,6 +622,79 @@ export const NavCustomizer: React.FC = () => {
         {t('plugin-admin-nav:dndHint')}
       </p>
 
+      {/* Toolbar: Undo/Redo, Bulk actions, Import/Export */}
+      <div style={toolbarStyle}>
+        {/* Undo / Redo */}
+        <button
+          onClick={handleUndo}
+          style={undoStack.length > 0 ? btnSmall : btnSmallDisabled}
+          disabled={undoStack.length === 0}
+          title="Ctrl+Z"
+        >
+          {t('plugin-admin-nav:undo')} ({undoStack.length})
+        </button>
+        <button
+          onClick={handleRedo}
+          style={redoStack.length > 0 ? btnSmall : btnSmallDisabled}
+          disabled={redoStack.length === 0}
+          title="Ctrl+Shift+Z"
+        >
+          {t('plugin-admin-nav:redo')} ({redoStack.length})
+        </button>
+
+        {/* Separator */}
+        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+
+        {/* Bulk show/hide */}
+        <button onClick={showAll} style={btnSmall}>
+          {t('plugin-admin-nav:showAll')}
+        </button>
+        <button onClick={hideAll} style={btnSmall}>
+          {t('plugin-admin-nav:hideAll')}
+        </button>
+
+        {/* Separator */}
+        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+
+        {/* Import / Export */}
+        <button onClick={handleExport} style={btnSmall}>
+          {t('plugin-admin-nav:exportConfig')}
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} style={btnSmall}>
+          {t('plugin-admin-nav:importConfig')}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={handleImport}
+        />
+      </div>
+
+      {/* Search/Filter */}
+      <div style={searchContainerStyle}>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('plugin-admin-nav:searchItems')}
+          style={searchInputStyle}
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} style={btnSmall}>
+            {t('plugin-admin-nav:clearSearch')}
+          </button>
+        )}
+      </div>
+
+      {/* No results */}
+      {isSearching && displayGroups.length === 0 && (
+        <p style={{ fontSize: 13, color: 'var(--theme-elevation-400)', textAlign: 'center', padding: '20px 0' }}>
+          {t('plugin-admin-nav:noResults')}
+        </p>
+      )}
+
       {/* DnD area */}
       <DndContext
         id={dndId}
@@ -382,7 +704,7 @@ export const NavCustomizer: React.FC = () => {
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={groupIds} strategy={verticalListSortingStrategy}>
-          {groups.map((group) => {
+          {displayGroups.map((group) => {
             const itemIds = group.items.map((item) => `item-${group.id}-${item.id}`)
 
             return (
@@ -407,14 +729,16 @@ export const NavCustomizer: React.FC = () => {
                 </SortableContext>
 
                 {/* Add item button */}
-                <div style={{ padding: '4px 8px' }}>
-                  <button
-                    onClick={() => setIsCreatingItem(group.id)}
-                    style={{ ...btnOutline, padding: '4px 8px', fontSize: 11, border: '1px dashed var(--theme-elevation-250)' }}
-                  >
-                    {t('plugin-admin-nav:addItem')}
-                  </button>
-                </div>
+                {!isSearching && (
+                  <div style={{ padding: '4px 8px' }}>
+                    <button
+                      onClick={() => setIsCreatingItem(group.id)}
+                      style={{ ...btnOutline, padding: '4px 8px', fontSize: 11, border: '1px dashed var(--theme-elevation-250)' }}
+                    >
+                      {t('plugin-admin-nav:addItem')}
+                    </button>
+                  </div>
+                )}
               </SortableGroup>
             )
           })}
@@ -441,9 +765,11 @@ export const NavCustomizer: React.FC = () => {
       </DndContext>
 
       {/* Add group button */}
-      <button onClick={() => setIsCreatingGroup(true)} style={btnOutline}>
-        {t('plugin-admin-nav:addGroup')}
-      </button>
+      {!isSearching && (
+        <button onClick={() => setIsCreatingGroup(true)} style={btnOutline}>
+          {t('plugin-admin-nav:addGroup')}
+        </button>
+      )}
 
       {/* Modals */}
       {(editingGroup || isCreatingGroup) && (
@@ -465,7 +791,7 @@ export const NavCustomizer: React.FC = () => {
       {isCreatingItem && (
         <NavItemEditor
           item={{
-            id: `item-${Date.now()}`,
+            id: crypto.randomUUID(),
             href: '/admin/',
             label: t('plugin-admin-nav:newLink'),
             icon: 'file-text',

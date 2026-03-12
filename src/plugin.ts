@@ -41,11 +41,11 @@ import {
 } from './endpoints/preferences.js'
 import { translations } from './translations/index.js'
 import { autoDiscoverNav } from './autoDiscover.js'
+import { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
 
 export const adminNavPlugin =
   (pluginConfig?: AdminNavPluginConfig): Plugin =>
   (incomingConfig: Config): Config => {
-    console.log('[admin-nav-plugin] Running plugin...')
     const config = { ...incomingConfig }
     const safeConfig = pluginConfig ?? {}
     const collectionSlug = safeConfig.collectionSlug ?? 'admin-nav-preferences'
@@ -54,9 +54,6 @@ export const adminNavPlugin =
 
     // Resolve defaultNav: use provided config or auto-discover from Payload config
     const defaultNav = safeConfig.defaultNav ?? autoDiscoverNav(incomingConfig)
-    if (!safeConfig.defaultNav) {
-      console.log(`[admin-nav-plugin] Auto-discovered ${defaultNav.length} nav group(s) from Payload config`)
-    }
 
     // 1. Merge i18n translations
     config.i18n = {
@@ -101,7 +98,7 @@ export const adminNavPlugin =
       navComponent,
       ...(Array.isArray(existingBeforeNav) ? existingBeforeNav : [existingBeforeNav]),
     ]
-    console.log('[admin-nav-plugin] beforeNavLinks set to:', config.admin.components.beforeNavLinks)
+    // beforeNavLinks configured
 
     // Add afterNav components if specified
     if (safeConfig.afterNav?.length) {
@@ -128,12 +125,25 @@ export const adminNavPlugin =
       {
         path: `${basePath}/default-nav`,
         method: 'get' as const,
-        handler: async () => {
-          return Response.json({
-            defaultNav,
-            afterNav: safeConfig.afterNav || [],
-            basePath: `/api${basePath}`,
-          })
+        handler: async (req) => {
+          if (!req.user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+
+          const userId = typeof req.user === 'object' ? (req.user as any).id : req.user
+          const { allowed, retryAfter } = rateLimit(`admin-nav:default:${userId}`, 60, 60_000)
+          if (!allowed) return rateLimitResponse(retryAfter)
+
+          try {
+            return Response.json({
+              defaultNav,
+              afterNav: safeConfig.afterNav || [],
+              basePath: `/api${basePath}`,
+            })
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Internal server error'
+            return Response.json({ error: message }, { status: 500 })
+          }
         },
       },
     ]

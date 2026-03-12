@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavPreferences } from '../hooks/useNavPreferences.js'
@@ -160,7 +160,7 @@ const ChildIcon: React.FC<{ icon: string }> = ({ icon }) => {
  */
 const AdminNav: React.FC = () => {
   const { t, i18n } = usePluginTranslation()
-  const { layout, isLoaded } = useNavPreferences()
+  const { layout, isLoaded, collapsedGroups, setCollapsedGroups } = useNavPreferences()
 
   // Next.js reactive hooks — update instantly on client-side navigation
   const pathname = usePathname()
@@ -184,20 +184,31 @@ const AdminNav: React.FC = () => {
       .filter((g) => g.items.length > 0)
   }, [layout])
 
-  // Collapsed groups state
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
-  React.useEffect(() => {
-    if (isLoaded && layout.length > 0) {
-      const initial: Record<string, boolean> = {}
-      layout.forEach((g) => {
-        if (g.defaultCollapsed) initial[g.id] = true
-      })
-      setCollapsed(initial)
+  // Build collapsed record from persisted collapsedGroups array + defaults
+  const collapsed = useMemo(() => {
+    const record: Record<string, boolean> = {}
+    // Apply defaultCollapsed from layout config
+    layout.forEach((g) => {
+      if (g.defaultCollapsed) record[g.id] = true
+    })
+    // Override with persisted collapsed state (persisted takes priority)
+    if (collapsedGroups.length > 0) {
+      // Clear defaults and use only persisted state
+      layout.forEach((g) => { record[g.id] = false })
+      collapsedGroups.forEach((id) => { record[id] = true })
     }
-  }, [isLoaded, layout])
+    return record
+  }, [layout, collapsedGroups])
 
   const toggleGroup = (groupId: string) => {
-    setCollapsed((prev) => ({ ...prev, [groupId]: !prev[groupId] }))
+    const isCurrentlyCollapsed = collapsed[groupId] ?? false
+    let newCollapsed: string[]
+    if (isCurrentlyCollapsed) {
+      newCollapsed = collapsedGroups.filter((id) => id !== groupId)
+    } else {
+      newCollapsed = [...collapsedGroups, groupId]
+    }
+    setCollapsedGroups(newCollapsed)
   }
 
   return (

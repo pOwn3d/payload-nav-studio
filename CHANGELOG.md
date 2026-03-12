@@ -5,6 +5,21 @@ All notable changes to `@consilioweb/admin-nav` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-12
+
+### Added
+- Rate limiting on all endpoints (60/min GET, 30/min PATCH/DELETE per user)
+- Input validation on PATCH preferences: validates `navLayout` structure, `groups` array, group `label` and `items` types
+- `src/utils/rateLimiter.ts` — shared in-memory rate limiter with auto-cleanup
+
+### Changed
+- Replaced `console.log` calls in `plugin.ts` with `payload.logger` (removed verbose init logs)
+- Error handling in `preferences.ts` now uses `req.payload.logger.error()` and returns proper 500 responses
+- Auth check added on GET `default-nav` endpoint (was unprotected)
+
+### Fixed
+- GET preferences catch block now returns 500 with error message instead of silently returning null
+
 ## [0.2.0] - 2026-02-21
 
 ### Changed
@@ -33,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `useNavPreferences` React hook
 - TypeScript strict mode, full type exports
 
+[0.5.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.2.0...v0.5.0
 [0.2.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/pOwn3d/payload-nav-studio/releases/tag/v0.1.0

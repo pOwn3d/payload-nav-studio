@@ -74,5 +74,24 @@ export const fr = {
     childUrlPlaceholder: 'Ex: /admin/collections/tickets?status=open',
     childIconPlaceholder: '#00E5FF ou ChevronRight',
     childIconLabel: 'Icône (nom ou #couleur)',
+
+    // Undo/Redo
+    undo: 'Annuler',
+    redo: 'Rétablir',
+
+    // Search
+    searchItems: 'Rechercher...',
+    clearSearch: 'Effacer',
+    noResults: 'Aucun résultat',
+
+    // Import/Export
+    exportConfig: 'Exporter',
+    importConfig: 'Importer',
+    importSuccess: 'Configuration importée !',
+    importError: 'Fichier de configuration invalide',
+
+    // Bulk actions
+    showAll: 'Tout afficher',
+    hideAll: 'Tout masquer',
   },
 }

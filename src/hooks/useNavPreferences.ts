@@ -4,6 +4,7 @@ import type { NavLayout, NavGroupConfig } from '../types.js'
 const CACHE_KEY = 'admin-nav-layout'
 const CACHE_DEFAULT_KEY = 'admin-nav-default'
 const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
+const CACHE_COLLAPSED_KEY = 'admin-nav-collapsed'
 
 // ── Module-level cache ──
 // These variables live in the JS module scope and survive React component
@@ -14,6 +15,7 @@ const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
 let _cachedLayout: NavGroupConfig[] | null = null
 let _cachedDefaultNav: NavGroupConfig[] | null = null
 let _cachedIsCustom: boolean | null = null
+let _cachedCollapsedGroups: string[] | null = null
 
 interface UseNavPreferencesReturn {
   /** Current nav layout (user's custom or default) */
@@ -30,10 +32,14 @@ interface UseNavPreferencesReturn {
   reset: () => Promise<boolean>
   /** Reload preferences from server */
   reload: () => Promise<void>
+  /** Collapsed group IDs persisted across sessions */
+  collapsedGroups: string[]
+  /** Update collapsed groups (debounced save to server) */
+  setCollapsedGroups: (groups: string[]) => void
 }
 
 /** Read cached layout from sessionStorage */
-function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; isCustom: boolean } | null {
+function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; isCustom: boolean; collapsedGroups: string[] } | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
@@ -41,7 +47,9 @@ function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; 
     const defaultRaw = sessionStorage.getItem(CACHE_DEFAULT_KEY)
     const defaultNav = defaultRaw ? JSON.parse(defaultRaw) : []
     const isCustom = sessionStorage.getItem(CACHE_CUSTOM_KEY) === '1'
-    return { layout, defaultNav, isCustom }
+    const collapsedRaw = sessionStorage.getItem(CACHE_COLLAPSED_KEY)
+    const collapsedGroups = collapsedRaw ? JSON.parse(collapsedRaw) : []
+    return { layout, defaultNav, isCustom, collapsedGroups }
   } catch {
     return null
   }
@@ -63,15 +71,27 @@ function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCu
   }
 }
 
+/** Write collapsed groups to both module cache and sessionStorage */
+function writeCollapsedCache(collapsedGroups: string[]): void {
+  _cachedCollapsedGroups = collapsedGroups
+  try {
+    sessionStorage.setItem(CACHE_COLLAPSED_KEY, JSON.stringify(collapsedGroups))
+  } catch {
+    // ignore
+  }
+}
+
 /** Clear both module cache and sessionStorage */
 function clearCache(): void {
   _cachedLayout = null
   _cachedDefaultNav = null
   _cachedIsCustom = null
+  _cachedCollapsedGroups = null
   try {
     sessionStorage.removeItem(CACHE_KEY)
     sessionStorage.removeItem(CACHE_DEFAULT_KEY)
     sessionStorage.removeItem(CACHE_CUSTOM_KEY)
+    sessionStorage.removeItem(CACHE_COLLAPSED_KEY)
   } catch {
     // ignore
   }
@@ -98,7 +118,9 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   const [isLoaded, setIsLoaded] = useState(_cachedLayout !== null)
   const [isSaving, setIsSaving] = useState(false)
   const [isCustom, setIsCustom] = useState(_cachedIsCustom ?? false)
+  const [collapsedGroups, setCollapsedGroupsState] = useState<string[]>(_cachedCollapsedGroups ?? [])
   const abortRef = useRef<AbortController | null>(null)
+  const collapsedSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadPreferences = useCallback(async () => {
     // Abort any in-flight request
@@ -136,6 +158,13 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
         newIsCustom = false
       }
 
+      // Restore collapsed groups from server preferences
+      const serverCollapsed: string[] = prefsData.collapsedGroups ?? []
+      if (serverCollapsed.length > 0) {
+        setCollapsedGroupsState(serverCollapsed)
+        writeCollapsedCache(serverCollapsed)
+      }
+
       setLayout(newLayout)
       setIsCustom(newIsCustom)
       setIsLoaded(true)
@@ -159,11 +188,13 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
         setLayout(cached.layout)
         setDefaultNav(cached.defaultNav)
         setIsCustom(cached.isCustom)
+        setCollapsedGroupsState(cached.collapsedGroups)
         setIsLoaded(true)
         // Populate module cache for future re-mounts
         _cachedLayout = cached.layout
         _cachedDefaultNav = cached.defaultNav
         _cachedIsCustom = cached.isCustom
+        _cachedCollapsedGroups = cached.collapsedGroups
       }
     }
 
@@ -216,6 +247,35 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
     }
   }, [basePath, defaultNav])
 
+  const setCollapsedGroups = useCallback((groups: string[]) => {
+    setCollapsedGroupsState(groups)
+    writeCollapsedCache(groups)
+
+    // Debounced save to server (500ms)
+    if (collapsedSaveTimerRef.current) {
+      clearTimeout(collapsedSaveTimerRef.current)
+    }
+    collapsedSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await fetch(`${basePath}/preferences`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ collapsedGroups: groups }),
+        })
+      } catch {
+        // Silent fail — cache still works
+      }
+    }, 500)
+  }, [basePath])
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    const timerRef = collapsedSaveTimerRef
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
   return {
     layout,
     isLoaded,
@@ -224,5 +284,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
     save,
     reset,
     reload: loadPreferences,
+    collapsedGroups,
+    setCollapsedGroups,
   }
 }

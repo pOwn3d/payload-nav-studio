@@ -44,7 +44,11 @@ export function createAdminNavPreferencesCollection(
       {
         name: 'navLayout',
         type: 'json',
-        required: true,
+      },
+      {
+        name: 'collapsedGroups',
+        type: 'json',
+        defaultValue: [],
       },
       {
         name: 'version',
