@@ -5,6 +5,7 @@ const CACHE_KEY = 'admin-nav-layout'
 const CACHE_DEFAULT_KEY = 'admin-nav-default'
 const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
 const CACHE_COLLAPSED_KEY = 'admin-nav-collapsed'
+const CACHE_VERSION_KEY = 'admin-nav-version'
 
 // ── Module-level cache ──
 // These variables live in the JS module scope and survive React component
@@ -16,6 +17,7 @@ let _cachedLayout: NavGroupConfig[] | null = null
 let _cachedDefaultNav: NavGroupConfig[] | null = null
 let _cachedIsCustom: boolean | null = null
 let _cachedCollapsedGroups: string[] | null = null
+let _cachedNavVersion: number | null = null
 
 interface UseNavPreferencesReturn {
   /** Current nav layout (user's custom or default) */
@@ -39,7 +41,7 @@ interface UseNavPreferencesReturn {
 }
 
 /** Read cached layout from sessionStorage */
-function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; isCustom: boolean; collapsedGroups: string[] } | null {
+function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; isCustom: boolean; collapsedGroups: string[]; navVersion: number | null } | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY)
     if (!raw) return null
@@ -49,23 +51,27 @@ function readCache(): { layout: NavGroupConfig[]; defaultNav: NavGroupConfig[]; 
     const isCustom = sessionStorage.getItem(CACHE_CUSTOM_KEY) === '1'
     const collapsedRaw = sessionStorage.getItem(CACHE_COLLAPSED_KEY)
     const collapsedGroups = collapsedRaw ? JSON.parse(collapsedRaw) : []
-    return { layout, defaultNav, isCustom, collapsedGroups }
+    const versionRaw = sessionStorage.getItem(CACHE_VERSION_KEY)
+    const navVersion = versionRaw ? Number(versionRaw) : null
+    return { layout, defaultNav, isCustom, collapsedGroups, navVersion }
   } catch {
     return null
   }
 }
 
 /** Write layout to both module cache and sessionStorage */
-function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCustom: boolean): void {
+function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCustom: boolean, navVersion?: number): void {
   // Module cache (instant on re-mount)
   _cachedLayout = layout
   _cachedDefaultNav = defaultNav
   _cachedIsCustom = isCustom
+  if (navVersion !== undefined) _cachedNavVersion = navVersion
   // sessionStorage (survives full page reload)
   try {
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(layout))
     sessionStorage.setItem(CACHE_DEFAULT_KEY, JSON.stringify(defaultNav))
     sessionStorage.setItem(CACHE_CUSTOM_KEY, isCustom ? '1' : '0')
+    if (navVersion !== undefined) sessionStorage.setItem(CACHE_VERSION_KEY, String(navVersion))
   } catch {
     // sessionStorage full or unavailable — module cache still works
   }
@@ -87,11 +93,13 @@ function clearCache(): void {
   _cachedDefaultNav = null
   _cachedIsCustom = null
   _cachedCollapsedGroups = null
+  _cachedNavVersion = null
   try {
     sessionStorage.removeItem(CACHE_KEY)
     sessionStorage.removeItem(CACHE_DEFAULT_KEY)
     sessionStorage.removeItem(CACHE_CUSTOM_KEY)
     sessionStorage.removeItem(CACHE_COLLAPSED_KEY)
+    sessionStorage.removeItem(CACHE_VERSION_KEY)
   } catch {
     // ignore
   }
@@ -121,6 +129,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   const [collapsedGroups, setCollapsedGroupsState] = useState<string[]>(_cachedCollapsedGroups ?? [])
   const abortRef = useRef<AbortController | null>(null)
   const collapsedSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const navVersionRef = useRef<number | undefined>(_cachedNavVersion ?? undefined)
 
   const loadPreferences = useCallback(async () => {
     // Abort any in-flight request
@@ -145,12 +154,29 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       const prefsData = await prefsRes.json()
 
       const newDefaultNav = defaultData.defaultNav || []
+      const currentNavVersion: number | undefined = defaultData.navVersion
+      navVersionRef.current = currentNavVersion
       setDefaultNav(newDefaultNav)
 
       let newLayout: NavGroupConfig[]
       let newIsCustom: boolean
 
-      if (prefsData.navLayout && prefsData.navLayout.groups) {
+      // Version migration: if the stored preferences were saved against a
+      // different nav structure (version mismatch), discard them so the
+      // user gets the updated default navigation instead of a stale layout.
+      const storedVersion: number | null = prefsData.version ?? null
+      const versionMismatch =
+        currentNavVersion !== undefined &&
+        storedVersion !== null &&
+        storedVersion !== currentNavVersion
+
+      if (versionMismatch) {
+        console.info('[admin-nav] Nav structure changed (stored version %d, current %d) — resetting preferences to defaults', storedVersion, currentNavVersion)
+        // Fire-and-forget: delete stale preferences on the server
+        fetch(`${basePath}/preferences`, { method: 'DELETE' }).catch(() => {})
+        newLayout = newDefaultNav
+        newIsCustom = false
+      } else if (prefsData.navLayout && prefsData.navLayout.groups) {
         newLayout = prefsData.navLayout.groups
         newIsCustom = true
       } else {
@@ -158,11 +184,13 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
         newIsCustom = false
       }
 
-      // Restore collapsed groups from server preferences
-      const serverCollapsed: string[] = prefsData.collapsedGroups ?? []
-      if (serverCollapsed.length > 0) {
-        setCollapsedGroupsState(serverCollapsed)
-        writeCollapsedCache(serverCollapsed)
+      // Restore collapsed groups from server preferences (skip if version mismatch — groups may no longer exist)
+      if (!versionMismatch) {
+        const serverCollapsed: string[] = prefsData.collapsedGroups ?? []
+        if (serverCollapsed.length > 0) {
+          setCollapsedGroupsState(serverCollapsed)
+          writeCollapsedCache(serverCollapsed)
+        }
       }
 
       setLayout(newLayout)
@@ -170,7 +198,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       setIsLoaded(true)
 
       // Persist to both caches for instant render
-      writeCache(newLayout, newDefaultNav, newIsCustom)
+      writeCache(newLayout, newDefaultNav, newIsCustom, currentNavVersion)
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.warn('[admin-nav] Error loading preferences:', err)
@@ -195,6 +223,8 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
         _cachedDefaultNav = cached.defaultNav
         _cachedIsCustom = cached.isCustom
         _cachedCollapsedGroups = cached.collapsedGroups
+        _cachedNavVersion = cached.navVersion
+        navVersionRef.current = cached.navVersion ?? undefined
       }
     }
 
@@ -206,7 +236,7 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   const save = useCallback(async (groups: NavGroupConfig[]): Promise<boolean> => {
     setIsSaving(true)
     try {
-      const navLayout: NavLayout = { groups, version: 1 }
+      const navLayout: NavLayout = { groups, version: navVersionRef.current ?? 1 }
       const res = await fetch(`${basePath}/preferences`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

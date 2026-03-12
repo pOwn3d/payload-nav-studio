@@ -322,13 +322,13 @@ adminNavPlugin({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `defaultNav` | `NavGroupConfig[]` | Auto-discovered | Initial sidebar structure. If omitted, the plugin auto-discovers collections, globals, and views from your Payload config |
-| `afterNav` | `string[]` | `[]` | Component paths to render after the navigation |
-| `collectionSlug` | `string` | `'admin-nav-preferences'` | Collection slug for preferences storage |
-| `userCollectionSlug` | `string` | `'users'` | User collection slug for the relationship |
-| `endpointBasePath` | `string` | `'/admin-nav'` | Base path for API endpoints |
-| `addCustomizerView` | `boolean` | `true` | Whether to add the Nav Customizer admin view |
-| `navComponentPath` | `string` | `'@consilioweb/admin-nav/client#AdminNav'` | Override the AdminNav component path (for `file:` or `link:` installs) |
+| `defaultNav` | `NavGroupConfig[]` | Auto-découvert | Structure initiale de la sidebar. Si omis, le plugin auto-découvre les collections, globals et vues depuis la config Payload |
+| `afterNav` | `string[]` | `[]` | Chemins de composants à afficher après la navigation |
+| `collectionSlug` | `string` | `'admin-nav-preferences'` | Slug de la collection pour le stockage des préférences |
+| `userCollectionSlug` | `string` | `'users'` | Slug de la collection utilisateurs pour la relation |
+| `endpointBasePath` | `string` | `'/admin-nav'` | Chemin de base pour les endpoints API |
+| `addCustomizerView` | `boolean` | `true` | Ajouter la vue admin Nav Customizer à `/admin/nav-customizer` |
+| `navComponentPath` | `string` | `'@consilioweb/admin-nav/client#AdminNav'` | Surcharger le chemin du composant AdminNav (pour les installations `file:` ou `link:`) |
 
 ### Types
 

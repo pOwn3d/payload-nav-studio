@@ -68,7 +68,7 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
     const { navLayout, collapsedGroups } = body
 
     // At least one of navLayout or collapsedGroups must be provided
-    if (!navLayout && !collapsedGroups) {
+    if (navLayout === undefined && collapsedGroups === undefined) {
       return Response.json({ error: 'navLayout or collapsedGroups is required' }, { status: 400 })
     }
 
@@ -89,11 +89,13 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
           if (!group || typeof group !== 'object') {
             return Response.json({ error: `navLayout.groups[${i}] must be an object` }, { status: 400 })
           }
-          if (group.label === undefined || group.label === null) {
-            return Response.json({ error: `navLayout.groups[${i}].label is required` }, { status: 400 })
+          // Groups can use either 'title' or 'label' for the group name
+          const groupTitle = group.title ?? group.label
+          if (groupTitle === undefined || groupTitle === null) {
+            return Response.json({ error: `navLayout.groups[${i}].title is required` }, { status: 400 })
           }
-          if (typeof group.label !== 'string' && typeof group.label !== 'object') {
-            return Response.json({ error: `navLayout.groups[${i}].label must be a string or object` }, { status: 400 })
+          if (typeof groupTitle !== 'string' && typeof groupTitle !== 'object') {
+            return Response.json({ error: `navLayout.groups[${i}].title must be a string or object` }, { status: 400 })
           }
           if (!Array.isArray(group.items)) {
             return Response.json({ error: `navLayout.groups[${i}].items must be an array` }, { status: 400 })

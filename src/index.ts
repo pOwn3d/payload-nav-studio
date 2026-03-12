@@ -8,7 +8,7 @@ export {
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
 export { getIconNames, getIconPath, iconPaths } from './icons.js'
-export { resolveLabel, isMultiLang } from './utils.js'
+export { resolveLabel, isMultiLang, computeNavFingerprint } from './utils.js'
 
 // Types
 export type {

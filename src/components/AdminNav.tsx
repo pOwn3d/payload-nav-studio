@@ -212,7 +212,13 @@ const AdminNav: React.FC = () => {
   }
 
   return (
-    <div style={{
+    <>
+      {/* Hide default Payload nav groups that render alongside admin-nav.
+          Targets CSS-module classed siblings while preserving afterNavLinks plugin sections. */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        [data-admin-nav] ~ * { display: none !important; }
+      ` }} />
+      <div data-admin-nav="" style={{
       ...styles.container,
       opacity: isLoaded ? 1 : 0,
       transition: 'opacity 0.15s ease-in',
@@ -295,6 +301,7 @@ const AdminNav: React.FC = () => {
         {t('plugin-admin-nav:customize')}
       </Link>
     </div>
+    </>
   )
 }
 

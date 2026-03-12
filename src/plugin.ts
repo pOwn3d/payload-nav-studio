@@ -42,6 +42,7 @@ import {
 import { translations } from './translations/index.js'
 import { autoDiscoverNav } from './autoDiscover.js'
 import { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
+import { computeNavFingerprint } from './utils.js'
 
 export const adminNavPlugin =
   (pluginConfig?: AdminNavPluginConfig): Plugin =>
@@ -54,6 +55,11 @@ export const adminNavPlugin =
 
     // Resolve defaultNav: use provided config or auto-discover from Payload config
     const defaultNav = safeConfig.defaultNav ?? autoDiscoverNav(incomingConfig)
+
+    // Compute a structural fingerprint of the defaultNav for preference migration.
+    // When the nav structure changes, stored preferences with an old version
+    // are automatically reset so users get the updated navigation.
+    const navVersion = computeNavFingerprint(defaultNav)
 
     // 1. Merge i18n translations
     config.i18n = {
@@ -137,6 +143,7 @@ export const adminNavPlugin =
           try {
             return Response.json({
               defaultNav,
+              navVersion,
               afterNav: safeConfig.afterNav || [],
               basePath: `/api${basePath}`,
             })
