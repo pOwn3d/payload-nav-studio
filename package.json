@@ -1,6 +1,6 @@
 {
   "name": "@consilioweb/admin-nav",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Payload CMS plugin — customizable admin sidebar navigation with drag & drop",
   "type": "module",
   "main": "./dist/index.cjs",

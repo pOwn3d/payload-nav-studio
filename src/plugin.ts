@@ -153,6 +153,31 @@ export const adminNavPlugin =
           }
         },
       },
+      // Runtime discover endpoint — runs autoDiscover against the final
+      // Payload config (after all plugins have registered their views,
+      // collections, and globals). Returns ALL available nav items.
+      {
+        path: `${basePath}/discover`,
+        method: 'get' as const,
+        handler: async (req) => {
+          if (!req.user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+
+          const userId = typeof req.user === 'object' ? (req.user as any).id : req.user
+          const { allowed, retryAfter } = rateLimit(`admin-nav:discover:${userId}`, 30, 60_000)
+          if (!allowed) return rateLimitResponse(retryAfter)
+
+          try {
+            const runtimeNav = autoDiscoverNav(req.payload.config as unknown as Config)
+            return Response.json({ groups: runtimeNav })
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Internal server error'
+            req.payload.logger.error(`[admin-nav] Discover failed: ${message}`)
+            return Response.json({ error: message }, { status: 500 })
+          }
+        },
+      },
     ]
 
     return config

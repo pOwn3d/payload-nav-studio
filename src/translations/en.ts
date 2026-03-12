@@ -93,5 +93,14 @@ export const en = {
     // Bulk actions
     showAll: 'Show all',
     hideAll: 'Hide all',
+
+    // Discover
+    discover: 'Discover',
+    discoverTooltip: 'Scan all available routes (collections, globals, views)',
+    discoverSuccess: '{{count}} new items discovered and added!',
+    discoverNone: 'All available items are already in your navigation.',
+    discoverError: 'Error discovering available items',
+    discoverMergeTitle: '{{count}} new items found',
+    discoverMergeHint: 'The following items were added to your navigation. Save to keep them.',
   },
 }

@@ -328,6 +328,60 @@ export const NavCustomizer: React.FC = () => {
   // ── Feature 4: Import/Export ──
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ── Feature 6: Discover all available routes ──
+  const [isDiscovering, setIsDiscovering] = useState(false)
+
+  const handleDiscover = useCallback(async () => {
+    setIsDiscovering(true)
+    try {
+      const res = await fetch('/api/admin-nav/discover')
+      if (!res.ok) {
+        showToast(t('plugin-admin-nav:discoverError'), true)
+        return
+      }
+      const data = await res.json()
+      const discoveredGroups: NavGroupConfig[] = data.groups || []
+
+      // Collect all existing item hrefs for dedup
+      const existingHrefs = new Set<string>()
+      for (const g of groups) {
+        for (const item of g.items) {
+          existingHrefs.add(item.href)
+        }
+      }
+
+      // Find new items and merge them into existing or new groups
+      let addedCount = 0
+      const newGroups = cloneGroups(groups)
+
+      for (const dGroup of discoveredGroups) {
+        const newItems = dGroup.items.filter((item) => !existingHrefs.has(item.href))
+        if (newItems.length === 0) continue
+
+        // Try to find an existing group with same id
+        const existingGroup = newGroups.find((g) => g.id === dGroup.id)
+        if (existingGroup) {
+          existingGroup.items.push(...newItems)
+        } else {
+          // Create new group with discovered items
+          newGroups.push({ ...dGroup, items: newItems })
+        }
+        addedCount += newItems.length
+      }
+
+      if (addedCount > 0) {
+        setGroupsWithUndo(newGroups)
+        showToast(t('plugin-admin-nav:discoverSuccess').replace('{{count}}', String(addedCount)))
+      } else {
+        showToast(t('plugin-admin-nav:discoverNone'))
+      }
+    } catch {
+      showToast(t('plugin-admin-nav:discoverError'), true)
+    } finally {
+      setIsDiscovering(false)
+    }
+  }, [groups, setGroupsWithUndo, showToast, t])
+
   const handleExport = useCallback(() => {
     const data = JSON.stringify(groups, null, 2)
     const blob = new Blob([data], { type: 'application/json' })
@@ -651,6 +705,19 @@ export const NavCustomizer: React.FC = () => {
         </button>
         <button onClick={hideAll} style={btnSmall}>
           {t('plugin-admin-nav:hideAll')}
+        </button>
+
+        {/* Separator */}
+        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+
+        {/* Discover */}
+        <button
+          onClick={handleDiscover}
+          style={isDiscovering ? btnSmallDisabled : { ...btnSmall, backgroundColor: 'var(--theme-elevation-100)' }}
+          disabled={isDiscovering}
+          title={t('plugin-admin-nav:discoverTooltip')}
+        >
+          {isDiscovering ? '…' : t('plugin-admin-nav:discover')}
         </button>
 
         {/* Separator */}

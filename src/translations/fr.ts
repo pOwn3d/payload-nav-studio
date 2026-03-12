@@ -93,5 +93,14 @@ export const fr = {
     // Bulk actions
     showAll: 'Tout afficher',
     hideAll: 'Tout masquer',
+
+    // Discover
+    discover: 'Découvrir',
+    discoverTooltip: 'Scanner toutes les routes disponibles (collections, globals, vues)',
+    discoverSuccess: '{{count}} nouveaux items découverts et ajoutés !',
+    discoverNone: 'Tous les items disponibles sont déjà dans votre navigation.',
+    discoverError: 'Erreur lors de la découverte des items',
+    discoverMergeTitle: '{{count}} nouveaux items trouvés',
+    discoverMergeHint: 'Les items suivants ont été ajoutés à votre navigation. Sauvegardez pour les conserver.',
   },
 }

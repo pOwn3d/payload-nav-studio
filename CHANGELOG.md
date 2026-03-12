@@ -5,6 +5,16 @@ All notable changes to `@consilioweb/admin-nav` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-12
+
+### Added
+- **Discover button** — New "Discover" button in the Customizer toolbar that scans ALL available routes at runtime (collections, globals, custom views from all plugins) and merges missing items into the current navigation
+- **Runtime discover endpoint** — `GET /api/admin-nav/discover` runs auto-discover against the final Payload config (after all plugins have loaded), solving the build-time ordering issue where plugins registered after admin-nav were invisible
+- **i18n** — Added discover-related translation keys (EN/FR)
+
+### Fixed
+- **Plugin views not discovered** — Views from SEO Analyzer, Maintenance, and other plugins were missing because auto-discover ran at config build time (before those plugins registered). The new runtime endpoint fixes this completely.
+
 ## [0.7.0] - 2026-03-12
 
 ### Added
