@@ -782,6 +782,16 @@ db.getCollection('admin-nav-preferences').drop()
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
+## Roadmap
+
+- Role-based navigation filtering (show/hide items per user role)
+- Keyboard shortcuts for navigation
+- Navigation search / command palette (Ctrl+K)
+- Nested sub-groups (multi-level hierarchy)
+- Badge counters on nav items (e.g. pending tickets count)
+- Navigation analytics (most clicked items)
+- Shared team navigation layouts
+
 ## ☕ Support
 
 If this plugin saves you time, consider buying me a coffee!
