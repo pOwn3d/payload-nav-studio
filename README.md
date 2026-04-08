@@ -21,7 +21,30 @@
 
 </div>
 
+<p align="center">
+  <a href="https://buymeacoffee.com/pown3d">
+    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" />
+  </a>
+</p>
+
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+> [!IMPORTANT]
+> ## ⚠️ Next.js 16 + Turbopack — Known Issue
+>
+> If you're using **Next.js 16** with Turbopack (default bundler), you may encounter a `createContext is not a function` error during `next build`. This is a **known Payload CMS issue** ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)) — not specific to this plugin.
+>
+> **Workaround** — Add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
+> ```ts
+> export const dynamic = 'force-dynamic'
+> ```
+>
+> And ensure all `@consilioweb/*` packages are in `transpilePackages` in your `next.config.ts`:
+> ```ts
+> transpilePackages: ['@consilioweb/seo-analyzer', '@consilioweb/admin-nav', /* ...other @consilioweb packages */],
+> ```
+>
+> ✅ **Next.js 15** works without any workaround.
 
 ## About
 
@@ -172,9 +195,22 @@ Inline SVG icons (Lucide-compatible, 24x24 viewBox) — zero external dependenci
 ### Instant Rendering
 
 - **Two-tier cache** — module-level (survives SPA navigation) + sessionStorage (survives page reload)
+- **Cache TTL** — 60-second TTL to skip redundant server fetches (v0.12.0)
 - **No loading flash** — nav renders instantly on page transitions
 - **Background sync** — always fetches fresh data from the server after rendering the cache
 - **SSR-safe** — module cache is `null` on the server, matching client initial state (no hydration mismatch)
+
+### CSS Architecture (v0.12.0)
+
+- **BEM naming** — all classes follow `.admin-nav__element--modifier` convention
+- **Custom properties** — theming via CSS variables (`--admin-nav-*`)
+- **StyleInjector** — runtime CSS injection component for Payload admin
+- **Zero flash** — styles loaded before first render
+
+### Unsaved Changes Guard (v0.12.0)
+
+- **beforeunload** — warns when navigating away with unsaved nav changes
+- **Undo/redo** — full history with useReducer (atomic state updates)
 
 ### Admin View
 
@@ -209,12 +245,12 @@ yarn add @consilioweb/admin-nav
 | Package | Version | Required |
 |---------|---------|----------|
 | `payload` | `^3.0.0` | **Yes** |
+| `react` | `^18.0.0 \|\| ^19.0.0` | **Yes** |
+| `react-dom` | `^18.0.0 \|\| ^19.0.0` | **Yes** |
 | `@payloadcms/next` | `^3.0.0` | Optional (admin views) |
 | `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
 | `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
 | `next` | `^14.0.0 \|\| ^15.0.0` | Optional (admin UI) |
-| `react` | `^18.0.0 \|\| ^19.0.0` | Optional (admin UI) |
-| `react-dom` | `^18.0.0 \|\| ^19.0.0` | Optional (admin UI) |
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
@@ -583,7 +619,8 @@ All endpoints are prefixed with the configured `endpointBasePath` (default: `/ad
 | `GET` | `/admin-nav/preferences` | Get the current user's navigation preferences |
 | `PATCH` | `/admin-nav/preferences` | Save the current user's navigation layout |
 | `DELETE` | `/admin-nav/preferences` | Reset to default navigation |
-| `GET` | `/admin-nav/default-nav` | Get the plugin's default nav config |
+| `GET` | `/admin-nav/default-nav` | Get the plugin's default nav config (permission-filtered) |
+| `POST` | `/admin-nav/import` | Import navigation from JSON file (max 1MB) |
 
 ### `useNavPreferences` Hook
 
@@ -744,6 +781,14 @@ db.getCollection('admin-nav-preferences').drop()
 ```
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## ☕ Support
+
+If this plugin saves you time, consider buying me a coffee!
+
+<a href="https://buymeacoffee.com/pown3d">
+  <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=pown3d&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" />
+</a>
 
 ## License
 

@@ -32,7 +32,7 @@
 
 import type { Config, Plugin } from 'payload'
 import { deepMergeSimple } from 'payload/shared'
-import type { AdminNavPluginConfig } from './types.js'
+import type { AdminNavPluginConfig, NavGroupConfig } from './types.js'
 import { createAdminNavPreferencesCollection } from './collections/AdminNavPreferences.js'
 import {
   createGetPreferencesHandler,
@@ -43,6 +43,68 @@ import { translations } from './translations/index.js'
 import { autoDiscoverNav } from './autoDiscover.js'
 import { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
 import { computeNavFingerprint } from './utils.js'
+
+/**
+ * Filter navigation groups/items based on user permissions.
+ * Removes collections/globals the user cannot read, preventing structure enumeration.
+ */
+async function filterNavByPermissions(
+  groups: NavGroupConfig[],
+  req: any,
+): Promise<NavGroupConfig[]> {
+  // Retrieve user permissions from Payload access control
+  let permissions: Record<string, any> | null = null
+  try {
+    if (req.payload?.auth?.permissions) {
+      permissions = await req.payload.auth.permissions(req)
+    }
+  } catch {
+    // If we can't fetch permissions, return the full nav (fail-open for admin UX)
+    return groups
+  }
+
+  if (!permissions) return groups
+
+  const collectionPerms = permissions.collections || {}
+  const globalPerms = permissions.globals || {}
+
+  const filtered: NavGroupConfig[] = []
+
+  for (const group of groups) {
+    const filteredItems = group.items.filter((item) => {
+      const href = item.href || ''
+
+      // Check collection-based items: /admin/collections/<slug>
+      const collMatch = href.match(/\/admin\/collections\/([^/?#]+)/)
+      if (collMatch) {
+        const slug = collMatch[1]
+        // If permission data exists for this collection, check read access
+        if (collectionPerms[slug] && collectionPerms[slug].read) {
+          return collectionPerms[slug].read.permission !== false
+        }
+      }
+
+      // Check global-based items: /admin/globals/<slug>
+      const globalMatch = href.match(/\/admin\/globals\/([^/?#]+)/)
+      if (globalMatch) {
+        const slug = globalMatch[1]
+        if (globalPerms[slug] && globalPerms[slug].read) {
+          return globalPerms[slug].read.permission !== false
+        }
+      }
+
+      // Custom views and other items: allow by default
+      return true
+    })
+
+    // Only include groups that have at least one visible item
+    if (filteredItems.length > 0) {
+      filtered.push({ ...group, items: filteredItems })
+    }
+  }
+
+  return filtered
+}
 
 export const adminNavPlugin =
   (pluginConfig?: AdminNavPluginConfig): Plugin =>
@@ -141,8 +203,11 @@ export const adminNavPlugin =
           if (!allowed) return rateLimitResponse(retryAfter)
 
           try {
+            // Filter nav items based on user permissions to avoid structure enumeration
+            const filteredNav = await filterNavByPermissions(defaultNav, req)
+
             return Response.json({
-              defaultNav,
+              defaultNav: filteredNav,
               navVersion,
               afterNav: safeConfig.afterNav || [],
               basePath: `/api${basePath}`,
@@ -170,7 +235,9 @@ export const adminNavPlugin =
 
           try {
             const runtimeNav = autoDiscoverNav(req.payload.config as unknown as Config)
-            return Response.json({ groups: runtimeNav })
+            // Filter discovered nav items based on user permissions
+            const filteredNav = await filterNavByPermissions(runtimeNav, req)
+            return Response.json({ groups: filteredNav })
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Internal server error'
             req.payload.logger.error(`[admin-nav] Discover failed: ${message}`)

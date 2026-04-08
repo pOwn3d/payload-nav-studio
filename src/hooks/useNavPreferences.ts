@@ -6,6 +6,8 @@ const CACHE_DEFAULT_KEY = 'admin-nav-default'
 const CACHE_CUSTOM_KEY = 'admin-nav-is-custom'
 const CACHE_COLLAPSED_KEY = 'admin-nav-collapsed'
 const CACHE_VERSION_KEY = 'admin-nav-version'
+const CACHE_TIMESTAMP_KEY = 'admin-nav-cache-ts'
+const CACHE_TTL_MS = 60_000 // 60 seconds
 
 // ── Module-level cache ──
 // These variables live in the JS module scope and survive React component
@@ -72,6 +74,7 @@ function writeCache(layout: NavGroupConfig[], defaultNav: NavGroupConfig[], isCu
     sessionStorage.setItem(CACHE_DEFAULT_KEY, JSON.stringify(defaultNav))
     sessionStorage.setItem(CACHE_CUSTOM_KEY, isCustom ? '1' : '0')
     if (navVersion !== undefined) sessionStorage.setItem(CACHE_VERSION_KEY, String(navVersion))
+    sessionStorage.setItem(CACHE_TIMESTAMP_KEY, String(Date.now()))
   } catch {
     // sessionStorage full or unavailable — module cache still works
   }
@@ -100,6 +103,7 @@ function clearCache(): void {
     sessionStorage.removeItem(CACHE_CUSTOM_KEY)
     sessionStorage.removeItem(CACHE_COLLAPSED_KEY)
     sessionStorage.removeItem(CACHE_VERSION_KEY)
+    sessionStorage.removeItem(CACHE_TIMESTAMP_KEY)
   } catch {
     // ignore
   }
@@ -228,7 +232,21 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       }
     }
 
-    // Always fetch in background to stay in sync with server
+    // Skip server fetch if cache is fresh (< TTL)
+    try {
+      const tsRaw = sessionStorage.getItem(CACHE_TIMESTAMP_KEY)
+      if (tsRaw && _cachedLayout) {
+        const elapsed = Date.now() - Number(tsRaw)
+        if (elapsed < CACHE_TTL_MS) {
+          // Cache is fresh, skip fetch
+          return () => { abortRef.current?.abort() }
+        }
+      }
+    } catch {
+      // sessionStorage unavailable — proceed to fetch
+    }
+
+    // Fetch in background to stay in sync with server
     loadPreferences()
     return () => { abortRef.current?.abort() }
   }, [loadPreferences])

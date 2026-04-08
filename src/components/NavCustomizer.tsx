@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useId, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useId, useEffect, useRef, useMemo, useReducer } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -32,123 +32,6 @@ import { resolveLabel } from '../utils.js'
 
 const MAX_UNDO_STACK = 20
 
-// ── Styles ──
-
-const containerStyle: React.CSSProperties = {
-  maxWidth: 700,
-  margin: '0 auto',
-  padding: '20px',
-}
-
-const headerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginBottom: 24,
-  gap: 12,
-}
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 20,
-  fontWeight: 700,
-  color: 'var(--theme-text)',
-  margin: 0,
-}
-
-const btnPrimary: React.CSSProperties = {
-  padding: '8px 16px',
-  border: 'none',
-  borderRadius: 6,
-  backgroundColor: 'var(--theme-success-500)',
-  color: 'white',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-}
-
-const btnSecondary: React.CSSProperties = {
-  padding: '8px 16px',
-  border: '1px solid var(--theme-elevation-200)',
-  borderRadius: 6,
-  background: 'none',
-  fontSize: 13,
-  cursor: 'pointer',
-  color: 'var(--theme-text)',
-}
-
-const btnOutline: React.CSSProperties = {
-  padding: '8px 16px',
-  border: '1px dashed var(--theme-elevation-300)',
-  borderRadius: 6,
-  background: 'none',
-  fontSize: 13,
-  cursor: 'pointer',
-  color: 'var(--theme-elevation-500)',
-  width: '100%',
-  textAlign: 'center' as const,
-}
-
-const btnSmall: React.CSSProperties = {
-  padding: '5px 10px',
-  border: '1px solid var(--theme-elevation-200)',
-  borderRadius: 5,
-  background: 'none',
-  fontSize: 11,
-  cursor: 'pointer',
-  color: 'var(--theme-elevation-600)',
-  whiteSpace: 'nowrap' as const,
-}
-
-const btnSmallDisabled: React.CSSProperties = {
-  ...btnSmall,
-  opacity: 0.4,
-  cursor: 'default',
-}
-
-const toolbarStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap' as const,
-  gap: 6,
-  marginBottom: 16,
-  alignItems: 'center',
-}
-
-const searchContainerStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  marginBottom: 16,
-}
-
-const searchInputStyle: React.CSSProperties = {
-  flex: 1,
-  padding: '7px 12px',
-  border: '1px solid var(--theme-elevation-200)',
-  borderRadius: 6,
-  fontSize: 13,
-  color: 'var(--theme-text)',
-  backgroundColor: 'var(--theme-input-bg, transparent)',
-  outline: 'none',
-}
-
-const toastStyle = (visible: boolean, isError: boolean): React.CSSProperties => ({
-  position: 'fixed',
-  bottom: 24,
-  right: 24,
-  padding: '10px 20px',
-  borderRadius: 8,
-  backgroundColor: isError ? 'var(--theme-error-500)' : 'var(--theme-success-500)',
-  color: 'white',
-  fontSize: 13,
-  fontWeight: 600,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-  transform: visible ? 'translateY(0)' : 'translateY(100px)',
-  opacity: visible ? 1 : 0,
-  transition: 'transform 0.3s, opacity 0.3s',
-  zIndex: 2000,
-  pointerEvents: 'none' as const,
-})
-
 // ── Helpers ──
 
 /** Deep clone a NavGroupConfig array */
@@ -177,6 +60,72 @@ function isValidNavConfig(data: unknown): data is NavGroupConfig[] {
   )
 }
 
+// ── Undo/Redo Reducer ──
+
+type NavState = {
+  groups: NavGroupConfig[]
+  undoStack: NavGroupConfig[][]
+  redoStack: NavGroupConfig[][]
+}
+
+type NavAction =
+  | { type: 'SET_GROUPS'; groups: NavGroupConfig[] }
+  | { type: 'INIT'; groups: NavGroupConfig[] }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  | { type: 'RESET' }
+
+const initialNavState: NavState = {
+  groups: [],
+  undoStack: [],
+  redoStack: [],
+}
+
+function navReducer(state: NavState, action: NavAction): NavState {
+  switch (action.type) {
+    case 'SET_GROUPS': {
+      const newUndoStack = [...state.undoStack, cloneGroups(state.groups)]
+      if (newUndoStack.length > MAX_UNDO_STACK) newUndoStack.shift()
+      return {
+        groups: action.groups,
+        undoStack: newUndoStack,
+        redoStack: [],
+      }
+    }
+    case 'INIT':
+      // Initialize without pushing to undo stack
+      return { ...state, groups: action.groups }
+    case 'UNDO': {
+      if (state.undoStack.length === 0) return state
+      const newUndoStack = [...state.undoStack]
+      const snapshot = newUndoStack.pop()!
+      const newRedoStack = [...state.redoStack, cloneGroups(state.groups)]
+      if (newRedoStack.length > MAX_UNDO_STACK) newRedoStack.shift()
+      return {
+        groups: snapshot,
+        undoStack: newUndoStack,
+        redoStack: newRedoStack,
+      }
+    }
+    case 'REDO': {
+      if (state.redoStack.length === 0) return state
+      const newRedoStack = [...state.redoStack]
+      const snapshot = newRedoStack.pop()!
+      const newUndoStack = [...state.undoStack, cloneGroups(state.groups)]
+      if (newUndoStack.length > MAX_UNDO_STACK) newUndoStack.shift()
+      return {
+        groups: snapshot,
+        undoStack: newUndoStack,
+        redoStack: newRedoStack,
+      }
+    }
+    case 'RESET':
+      return initialNavState
+    default:
+      return state
+  }
+}
+
 /**
  * NavCustomizer — Full drag & drop navigation editor.
  * Allows reordering groups and items, toggling visibility,
@@ -186,7 +135,8 @@ function isValidNavConfig(data: unknown): data is NavGroupConfig[] {
 export const NavCustomizer: React.FC = () => {
   const { t, i18n } = usePluginTranslation()
   const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences()
-  const [groups, setGroups] = useState<NavGroupConfig[]>([])
+  const [navState, dispatch] = useReducer(navReducer, initialNavState)
+  const { groups, undoStack, redoStack } = navState
   const [initialized, setInitialized] = useState(false)
 
   const lang = i18n.language
@@ -209,69 +159,29 @@ export const NavCustomizer: React.FC = () => {
   const [activeId, setActiveId] = useState<string | null>(null)
   const dndId = useId()
 
-  // ── Feature 1: Undo/Redo Stack ──
-  const [undoStack, setUndoStack] = useState<NavGroupConfig[][]>([])
-  const [redoStack, setRedoStack] = useState<NavGroupConfig[][]>([])
+  // ── Undo/Redo via reducer ──
 
-  /** Push current state onto the undo stack before a change */
-  const pushUndo = useCallback((currentGroups: NavGroupConfig[]) => {
-    setUndoStack((prev) => {
-      const next = [...prev, cloneGroups(currentGroups)]
-      if (next.length > MAX_UNDO_STACK) next.shift()
-      return next
-    })
-    // Any new action clears the redo stack
-    setRedoStack([])
-  }, [])
-
-  /** Wrapper around setGroups that also pushes to undo */
+  /** Wrapper that dispatches SET_GROUPS (with undo tracking) */
   const setGroupsWithUndo = useCallback(
     (updater: NavGroupConfig[] | ((prev: NavGroupConfig[]) => NavGroupConfig[])) => {
-      setGroups((prev) => {
-        pushUndo(prev)
-        return typeof updater === 'function' ? updater(prev) : updater
-      })
+      // For functional updaters, we need current groups — read from ref
+      if (typeof updater === 'function') {
+        // Use a callback pattern: dispatch the result
+        dispatch({ type: 'SET_GROUPS', groups: updater(navState.groups) })
+      } else {
+        dispatch({ type: 'SET_GROUPS', groups: updater })
+      }
     },
-    [pushUndo],
+    [navState.groups],
   )
 
   const handleUndo = useCallback(() => {
-    if (undoStack.length === 0) return
-    setUndoStack((prev) => {
-      const newStack = [...prev]
-      const snapshot = newStack.pop()!
-      setRedoStack((r) => {
-        const newRedo = [...r]
-        // Push current groups to redo before restoring
-        setGroups((currentGroups) => {
-          newRedo.push(cloneGroups(currentGroups))
-          return snapshot
-        })
-        if (newRedo.length > MAX_UNDO_STACK) newRedo.shift()
-        return newRedo
-      })
-      return newStack
-    })
-  }, [undoStack.length])
+    dispatch({ type: 'UNDO' })
+  }, [])
 
   const handleRedo = useCallback(() => {
-    if (redoStack.length === 0) return
-    setRedoStack((prev) => {
-      const newStack = [...prev]
-      const snapshot = newStack.pop()!
-      setUndoStack((u) => {
-        const newUndo = [...u]
-        // Push current groups to undo before restoring
-        setGroups((currentGroups) => {
-          newUndo.push(cloneGroups(currentGroups))
-          return snapshot
-        })
-        if (newUndo.length > MAX_UNDO_STACK) newUndo.shift()
-        return newUndo
-      })
-      return newStack
-    })
-  }, [redoStack.length])
+    dispatch({ type: 'REDO' })
+  }, [])
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -315,10 +225,23 @@ export const NavCustomizer: React.FC = () => {
   // Initialize groups from loaded layout
   React.useEffect(() => {
     if (isLoaded && layout.length > 0 && !initialized) {
-      setGroups(cloneGroups(layout))
+      dispatch({ type: 'INIT', groups: cloneGroups(layout) })
       setInitialized(true)
     }
   }, [isLoaded, layout, initialized])
+
+  // ── beforeunload guard ──
+  useEffect(() => {
+    const hasChanges = JSON.stringify(groups) !== JSON.stringify(layout)
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    if (hasChanges) window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [groups, layout])
 
   const showToast = useCallback((message: string, isError: boolean = false) => {
     setToast({ message, isError, visible: true })
@@ -399,6 +322,13 @@ export const NavCustomizer: React.FC = () => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (!file) return
+
+      // Reject files larger than 1MB to prevent abuse
+      if (file.size > 1024 * 1024) {
+        showToast(t('plugin-admin-nav:importError'), true)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
 
       const reader = new FileReader()
       reader.onload = (evt) => {
@@ -613,8 +543,7 @@ export const NavCustomizer: React.FC = () => {
     const success = await reset()
     if (success) {
       setInitialized(false) // Will reload from layout
-      setUndoStack([])
-      setRedoStack([])
+      dispatch({ type: 'RESET' })
       showToast(t('plugin-admin-nav:resetSuccess'))
     } else {
       showToast(t('plugin-admin-nav:resetError'), true)
@@ -625,8 +554,8 @@ export const NavCustomizer: React.FC = () => {
 
   if (!isLoaded) {
     return (
-      <div style={containerStyle}>
-        <p style={{ color: 'var(--theme-elevation-400)', fontSize: 14 }}>{t('plugin-admin-nav:loading')}</p>
+      <div className="admin-nav-customizer">
+        <p className="admin-nav-customizer__no-results">{t('plugin-admin-nav:loading')}</p>
       </div>
     )
   }
@@ -655,33 +584,33 @@ export const NavCustomizer: React.FC = () => {
   const isSearching = searchQuery.trim().length > 0
 
   return (
-    <div style={containerStyle}>
+    <div className="admin-nav-customizer">
       {/* Header */}
-      <div style={headerStyle}>
-        <h1 style={titleStyle}>{t('plugin-admin-nav:customizeTitle')}</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div className="admin-nav-customizer__header">
+        <h1 className="admin-nav-customizer__title">{t('plugin-admin-nav:customizeTitle')}</h1>
+        <div className="admin-nav-customizer__actions">
           {isCustom && (
-            <button onClick={handleReset} style={btnSecondary} disabled={isSaving}>
+            <button onClick={handleReset} className="admin-nav-btn--secondary" disabled={isSaving}>
               {t('plugin-admin-nav:reset')}
             </button>
           )}
-          <button onClick={handleSave} style={btnPrimary} disabled={isSaving}>
+          <button onClick={handleSave} className="admin-nav-btn--primary" disabled={isSaving}>
             {isSaving ? t('plugin-admin-nav:saving') : t('plugin-admin-nav:save')}
           </button>
         </div>
       </div>
 
       {/* Hint */}
-      <p style={{ fontSize: 12, color: 'var(--theme-elevation-500)', marginBottom: 16 }}>
+      <p className="admin-nav-customizer__hint">
         {t('plugin-admin-nav:dndHint')}
       </p>
 
       {/* Toolbar: Undo/Redo, Bulk actions, Import/Export */}
-      <div style={toolbarStyle}>
+      <div className="admin-nav-customizer__toolbar">
         {/* Undo / Redo */}
         <button
           onClick={handleUndo}
-          style={undoStack.length > 0 ? btnSmall : btnSmallDisabled}
+          className="admin-nav-btn--small"
           disabled={undoStack.length === 0}
           title="Ctrl+Z"
         >
@@ -689,7 +618,7 @@ export const NavCustomizer: React.FC = () => {
         </button>
         <button
           onClick={handleRedo}
-          style={redoStack.length > 0 ? btnSmall : btnSmallDisabled}
+          className="admin-nav-btn--small"
           disabled={redoStack.length === 0}
           title="Ctrl+Shift+Z"
         >
@@ -697,59 +626,59 @@ export const NavCustomizer: React.FC = () => {
         </button>
 
         {/* Separator */}
-        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+        <span className="admin-nav-customizer__separator" />
 
         {/* Bulk show/hide */}
-        <button onClick={showAll} style={btnSmall}>
+        <button onClick={showAll} className="admin-nav-btn--small">
           {t('plugin-admin-nav:showAll')}
         </button>
-        <button onClick={hideAll} style={btnSmall}>
+        <button onClick={hideAll} className="admin-nav-btn--small">
           {t('plugin-admin-nav:hideAll')}
         </button>
 
         {/* Separator */}
-        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+        <span className="admin-nav-customizer__separator" />
 
         {/* Discover */}
         <button
           onClick={handleDiscover}
-          style={isDiscovering ? btnSmallDisabled : { ...btnSmall, backgroundColor: 'var(--theme-elevation-100)' }}
+          className={isDiscovering ? 'admin-nav-btn--small' : 'admin-nav-btn--small-discover'}
           disabled={isDiscovering}
           title={t('plugin-admin-nav:discoverTooltip')}
         >
-          {isDiscovering ? '…' : t('plugin-admin-nav:discover')}
+          {isDiscovering ? '...' : t('plugin-admin-nav:discover')}
         </button>
 
         {/* Separator */}
-        <span style={{ width: 1, height: 20, backgroundColor: 'var(--theme-elevation-200)', margin: '0 4px' }} />
+        <span className="admin-nav-customizer__separator" />
 
         {/* Import / Export */}
-        <button onClick={handleExport} style={btnSmall}>
+        <button onClick={handleExport} className="admin-nav-btn--small">
           {t('plugin-admin-nav:exportConfig')}
         </button>
-        <button onClick={() => fileInputRef.current?.click()} style={btnSmall}>
+        <button onClick={() => fileInputRef.current?.click()} className="admin-nav-btn--small">
           {t('plugin-admin-nav:importConfig')}
         </button>
         <input
           ref={fileInputRef}
           type="file"
           accept=".json,application/json"
-          style={{ display: 'none' }}
+          className="admin-nav-file-input--hidden"
           onChange={handleImport}
         />
       </div>
 
       {/* Search/Filter */}
-      <div style={searchContainerStyle}>
+      <div className="admin-nav-customizer__search">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('plugin-admin-nav:searchItems')}
-          style={searchInputStyle}
+          className="admin-nav-customizer__search-input"
         />
         {searchQuery && (
-          <button onClick={() => setSearchQuery('')} style={btnSmall}>
+          <button onClick={() => setSearchQuery('')} className="admin-nav-btn--small">
             {t('plugin-admin-nav:clearSearch')}
           </button>
         )}
@@ -757,7 +686,7 @@ export const NavCustomizer: React.FC = () => {
 
       {/* No results */}
       {isSearching && displayGroups.length === 0 && (
-        <p style={{ fontSize: 13, color: 'var(--theme-elevation-400)', textAlign: 'center', padding: '20px 0' }}>
+        <p className="admin-nav-customizer__no-results">
           {t('plugin-admin-nav:noResults')}
         </p>
       )}
@@ -797,10 +726,10 @@ export const NavCustomizer: React.FC = () => {
 
                 {/* Add item button */}
                 {!isSearching && (
-                  <div style={{ padding: '4px 8px' }}>
+                  <div className="admin-nav-customizer__add-item-wrap">
                     <button
                       onClick={() => setIsCreatingItem(group.id)}
-                      style={{ ...btnOutline, padding: '4px 8px', fontSize: 11, border: '1px dashed var(--theme-elevation-250)' }}
+                      className="admin-nav-btn--outline-sm"
                     >
                       {t('plugin-admin-nav:addItem')}
                     </button>
@@ -814,17 +743,7 @@ export const NavCustomizer: React.FC = () => {
         {/* Drag overlay */}
         <DragOverlay>
           {activeId ? (
-            <div style={{
-              padding: '8px 16px',
-              borderRadius: 6,
-              backgroundColor: 'var(--theme-elevation-100)',
-              border: '1px solid var(--theme-elevation-300)',
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--theme-text)',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              cursor: 'grabbing',
-            }}>
+            <div className="admin-nav-customizer__drag-overlay">
               {getOverlayLabel()}
             </div>
           ) : null}
@@ -833,7 +752,7 @@ export const NavCustomizer: React.FC = () => {
 
       {/* Add group button */}
       {!isSearching && (
-        <button onClick={() => setIsCreatingGroup(true)} style={btnOutline}>
+        <button onClick={() => setIsCreatingGroup(true)} className="admin-nav-btn--outline">
           {t('plugin-admin-nav:addGroup')}
         </button>
       )}
@@ -870,7 +789,11 @@ export const NavCustomizer: React.FC = () => {
       )}
 
       {/* Toast */}
-      <div style={toastStyle(toast.visible, toast.isError)}>
+      <div className={[
+        'admin-nav-toast',
+        toast.visible && 'admin-nav-toast--visible',
+        toast.isError ? 'admin-nav-toast--error' : 'admin-nav-toast--success',
+      ].filter(Boolean).join(' ')}>
         {toast.message}
       </div>
     </div>

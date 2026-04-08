@@ -11,25 +11,6 @@ interface GroupEditorProps {
   onCancel: () => void
 }
 
-const fieldStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 8px',
-  border: '1px solid var(--theme-elevation-200)',
-  borderRadius: 4,
-  fontSize: 13,
-  backgroundColor: 'var(--theme-input-bg)',
-  color: 'var(--theme-text)',
-  outline: 'none',
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--theme-elevation-500)',
-  marginBottom: 4,
-  display: 'block',
-}
-
 export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCancel }) => {
   const { t, i18n } = usePluginTranslation()
   const isNew = !group
@@ -94,43 +75,17 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
   const availableLangs = i18nLanguages?.filter((l) => l !== 'cimode') || [i18n.language]
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={onCancel}
-    >
-      <div
-        style={{
-          backgroundColor: 'var(--theme-elevation-0)',
-          borderRadius: 12,
-          padding: 24,
-          width: 380,
-          maxWidth: '90vw',
-          maxHeight: '85vh',
-          overflowY: 'auto',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--theme-text)' }}>
+    <div className="admin-nav-modal-overlay" onClick={onCancel}>
+      <div className="admin-nav-modal admin-nav-modal--sm" onClick={(e) => e.stopPropagation()}>
+        <h3 className="admin-nav-modal__title">
           {isNew ? t('plugin-admin-nav:newGroup') : t('plugin-admin-nav:editGroup')}
         </h3>
 
         {/* Title */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <label style={{ ...labelStyle, marginBottom: 0 }}>{t('plugin-admin-nav:titleField')}</label>
-            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--theme-elevation-500)', cursor: 'pointer' }}>
+        <div className="admin-nav-modal__field-group">
+          <div className="admin-nav-modal__field-row">
+            <label className="admin-nav-modal__label admin-nav-modal__label--inline">{t('plugin-admin-nav:titleField')}</label>
+            <label className="admin-nav-modal__multilang-toggle">
               <input
                 type="checkbox"
                 checked={useMultiLang}
@@ -148,10 +103,10 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
           </div>
 
           {useMultiLang ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="admin-nav-modal__multilang-fields">
               {availableLangs.map((lang) => (
-                <div key={lang} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--theme-elevation-400)', width: 20, textAlign: 'center', textTransform: 'uppercase' }}>{lang}</span>
+                <div key={lang} className="admin-nav-modal__lang-row">
+                  <span className="admin-nav-modal__lang-code">{lang}</span>
                   <input
                     type="text"
                     value={titleRecord[lang] || ''}
@@ -163,7 +118,7 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
                     }}
                     placeholder={t('plugin-admin-nav:titlePlaceholder')}
                     autoFocus={lang === i18n.language}
-                    style={fieldStyle}
+                    className="admin-nav-modal__input"
                   />
                 </div>
               ))}
@@ -178,27 +133,27 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
               }}
               placeholder={t('plugin-admin-nav:titlePlaceholder')}
               autoFocus
-              style={fieldStyle}
+              className="admin-nav-modal__input"
             />
           )}
         </div>
 
         {/* ID */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>{t('plugin-admin-nav:idField')}</label>
+        <div className="admin-nav-modal__field-group">
+          <label className="admin-nav-modal__label">{t('plugin-admin-nav:idField')}</label>
           <input
             type="text"
             value={id}
             onChange={(e) => setId(e.target.value)}
             placeholder={t('plugin-admin-nav:idPlaceholder')}
-            style={fieldStyle}
+            className="admin-nav-modal__input"
             disabled={!isNew}
           />
         </div>
 
         {/* Default collapsed */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--theme-text)', cursor: 'pointer' }}>
+        <div className="admin-nav-modal__field-group--lg">
+          <label className="admin-nav-modal__checkbox-label">
             <input
               type="checkbox"
               checked={defaultCollapsed}
@@ -209,34 +164,14 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid var(--theme-elevation-200)',
-              borderRadius: 6,
-              background: 'none',
-              fontSize: 13,
-              cursor: 'pointer',
-              color: 'var(--theme-text)',
-            }}
-          >
+        <div className="admin-nav-modal__actions">
+          <button onClick={onCancel} className="admin-nav-btn--secondary">
             {t('plugin-admin-nav:cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={!resolvedTitle.trim()}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderRadius: 6,
-              backgroundColor: resolvedTitle.trim() ? 'var(--theme-success-500)' : 'var(--theme-elevation-300)',
-              color: 'white',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: resolvedTitle.trim() ? 'pointer' : 'not-allowed',
-            }}
+            className="admin-nav-btn--primary"
           >
             {isNew ? t('plugin-admin-nav:create') : t('plugin-admin-nav:save')}
           </button>

@@ -12,25 +12,6 @@ interface NavItemEditorProps {
   onCancel: () => void
 }
 
-const fieldStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 8px',
-  border: '1px solid var(--theme-elevation-200)',
-  borderRadius: 4,
-  fontSize: 13,
-  backgroundColor: 'var(--theme-input-bg)',
-  color: 'var(--theme-text)',
-  outline: 'none',
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'var(--theme-elevation-500)',
-  marginBottom: 4,
-  display: 'block',
-}
-
 export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCancel }) => {
   const { t, i18n } = usePluginTranslation()
 
@@ -72,11 +53,25 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   const availableLangs = i18nLanguages?.filter((l) => l !== 'cimode') || [i18n.language]
 
   const handleSave = () => {
+    // Validate href — must start with '/' or be empty, reject dangerous protocols
+    const trimmedHref = href.trim()
+    if (trimmedHref) {
+      const hrefLower = trimmedHref.toLowerCase()
+      if (!hrefLower.startsWith('/')) {
+        alert('URL must start with /')
+        return
+      }
+      if (hrefLower.startsWith('javascript:') || hrefLower.startsWith('data:')) {
+        alert('Forbidden URL protocol')
+        return
+      }
+    }
+
     const finalLabel = getFinalLabel()
     onSave({
       ...item,
       label: finalLabel || item.label,
-      href: href.trim() || item.href,
+      href: trimmedHref || item.href,
       icon,
       matchPrefix,
       children: children.length > 0 ? children : undefined,
@@ -152,42 +147,17 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-    }}
-    onClick={onCancel}
-    >
-      <div
-        style={{
-          backgroundColor: 'var(--theme-elevation-0)',
-          borderRadius: 12,
-          padding: 24,
-          width: 420,
-          maxWidth: '90vw',
-          maxHeight: '85vh',
-          overflowY: 'auto',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600, color: 'var(--theme-text)' }}>
+    <div className="admin-nav-modal-overlay" onClick={onCancel}>
+      <div className="admin-nav-modal admin-nav-modal--md" onClick={(e) => e.stopPropagation()}>
+        <h3 className="admin-nav-modal__title">
           {t('plugin-admin-nav:editItem')}
         </h3>
 
         {/* Label */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <label style={{ ...labelStyle, marginBottom: 0 }}>{t('plugin-admin-nav:labelField')}</label>
-            <label style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--theme-elevation-500)', cursor: 'pointer' }}>
+        <div className="admin-nav-modal__field-group">
+          <div className="admin-nav-modal__field-row">
+            <label className="admin-nav-modal__label admin-nav-modal__label--inline">{t('plugin-admin-nav:labelField')}</label>
+            <label className="admin-nav-modal__multilang-toggle">
               <input
                 type="checkbox"
                 checked={useMultiLang}
@@ -205,49 +175,42 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
           </div>
 
           {useMultiLang ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="admin-nav-modal__multilang-fields">
               {availableLangs.map((lang) => (
-                <div key={lang} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--theme-elevation-400)', width: 20, textAlign: 'center', textTransform: 'uppercase' }}>{lang}</span>
+                <div key={lang} className="admin-nav-modal__lang-row">
+                  <span className="admin-nav-modal__lang-code">{lang}</span>
                   <input
                     type="text"
                     value={labelRecord[lang] || ''}
                     onChange={(e) => setLabelRecord((prev) => ({ ...prev, [lang]: e.target.value }))}
-                    style={fieldStyle}
+                    className="admin-nav-modal__input"
                     autoFocus={lang === i18n.language}
                   />
                 </div>
               ))}
             </div>
           ) : (
-            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} style={fieldStyle} />
+            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} className="admin-nav-modal__input" />
           )}
         </div>
 
         {/* URL */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>{t('plugin-admin-nav:urlField')}</label>
-          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} style={fieldStyle} />
+        <div className="admin-nav-modal__field-group">
+          <label className="admin-nav-modal__label">{t('plugin-admin-nav:urlField')}</label>
+          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} className="admin-nav-modal__input" />
         </div>
 
         {/* Icon */}
-        <div style={{ marginBottom: 12, position: 'relative' }}>
-          <label style={labelStyle}>{t('plugin-admin-nav:iconField')}</label>
+        <div className="admin-nav-modal__field-group admin-nav-modal__field-group--relative">
+          <label className="admin-nav-modal__label">{t('plugin-admin-nav:iconField')}</label>
           <button
             onClick={() => setShowIconPicker(!showIconPicker)}
-            style={{
-              ...fieldStyle,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              textAlign: 'left',
-            }}
+            className="admin-nav-modal__input admin-nav-modal__input--icon-btn"
           >
             {icon.startsWith('#') ? (
-              <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', backgroundColor: icon }} />
+              <span className="admin-nav-modal__icon-dot" style={{ backgroundColor: icon }} />
             ) : (
-              <span style={{ fontSize: 12, color: 'var(--theme-elevation-500)' }}>{icon}</span>
+              <span className="admin-nav-modal__icon-name">{icon}</span>
             )}
           </button>
           {showIconPicker && (
@@ -256,8 +219,8 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
         </div>
 
         {/* matchPrefix */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--theme-text)', cursor: 'pointer' }}>
+        <div className="admin-nav-modal__field-group--lg">
+          <label className="admin-nav-modal__checkbox-label">
             <input
               type="checkbox"
               checked={matchPrefix}
@@ -268,111 +231,82 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
         </div>
 
         {/* Children / Sous-menus */}
-        <div style={{
-          marginBottom: 16,
-          border: '1px solid var(--theme-elevation-150)',
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: 'var(--theme-elevation-50)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: children.length > 0 ? 8 : 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--theme-elevation-500)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="admin-nav-submenus">
+          <div className={`admin-nav-submenus__header${children.length > 0 ? ' admin-nav-submenus__header--has-items' : ''}`}>
+            <span className="admin-nav-submenus__title">
               {t('plugin-admin-nav:submenus')} ({children.length})
             </span>
             <button
               type="button"
               onClick={addChild}
               disabled={editingChildIndex !== null}
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: editingChildIndex !== null ? 'var(--theme-elevation-300)' : 'var(--theme-success-500)',
-                background: 'none',
-                border: 'none',
-                cursor: editingChildIndex !== null ? 'default' : 'pointer',
-                padding: '2px 0',
-              }}
+              className="admin-nav-submenus__add-btn"
             >
               {t('plugin-admin-nav:addSubmenu')}
             </button>
           </div>
 
           {children.length === 0 && editingChildIndex === null && (
-            <div style={{ fontSize: 11, color: 'var(--theme-elevation-400)', fontStyle: 'italic' }}>
+            <div className="admin-nav-submenus__empty">
               {t('plugin-admin-nav:noSubmenus')}
             </div>
           )}
 
           {children.map((child, index) => (
-            <div key={child.id} style={{ marginBottom: index < children.length - 1 ? 4 : 0 }}>
+            <div key={child.id} className="admin-nav-submenus__child-wrapper">
               {/* Child display row */}
               {editingChildIndex !== index && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '4px 6px',
-                  borderRadius: 4,
-                  backgroundColor: 'var(--theme-elevation-0)',
-                  border: '1px solid var(--theme-elevation-100)',
-                }}>
+                <div className="admin-nav-submenus__child-row">
                   {/* Icon dot or icon name */}
                   {child.icon.startsWith('#') ? (
-                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: child.icon, flexShrink: 0 }} />
+                    <span className="admin-nav-submenus__child-dot" style={{ backgroundColor: child.icon }} />
                   ) : (
-                    <span style={{ fontSize: 10, color: 'var(--theme-elevation-400)', flexShrink: 0, width: 8, textAlign: 'center' }}>●</span>
+                    <span className="admin-nav-submenus__child-bullet">&#x25CF;</span>
                   )}
                   {/* Label + href */}
-                  <span style={{ fontSize: 12, color: 'var(--theme-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {resolveLabel(child.label, i18n.language, i18n.fallbackLanguage as string) || <em style={{ color: 'var(--theme-elevation-300)' }}>{t('plugin-admin-nav:noLabel')}</em>}
+                  <span className="admin-nav-submenus__child-label">
+                    {resolveLabel(child.label, i18n.language, i18n.fallbackLanguage as string) || <em>{t('plugin-admin-nav:noLabel')}</em>}
                   </span>
-                  <span style={{ fontSize: 10, color: 'var(--theme-elevation-400)', flexShrink: 0, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span className="admin-nav-submenus__child-href">
                     {child.href}
                   </span>
                   {/* Action buttons */}
-                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                  <div className="admin-nav-submenus__child-actions">
                     <button type="button" onClick={() => moveChild(index, -1)} disabled={index === 0} title={t('plugin-admin-nav:moveUp')}
-                      style={{ background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', color: index === 0 ? 'var(--theme-elevation-200)' : 'var(--theme-elevation-500)' }}>↑</button>
+                      className={`admin-nav-submenus__child-action-btn ${index === 0 ? 'admin-nav-submenus__child-action-btn--disabled' : 'admin-nav-submenus__child-action-btn--enabled'}`}>&#x2191;</button>
                     <button type="button" onClick={() => moveChild(index, 1)} disabled={index === children.length - 1} title={t('plugin-admin-nav:moveDown')}
-                      style={{ background: 'none', border: 'none', cursor: index === children.length - 1 ? 'default' : 'pointer', fontSize: 12, padding: '0 2px', color: index === children.length - 1 ? 'var(--theme-elevation-200)' : 'var(--theme-elevation-500)' }}>↓</button>
+                      className={`admin-nav-submenus__child-action-btn ${index === children.length - 1 ? 'admin-nav-submenus__child-action-btn--disabled' : 'admin-nav-submenus__child-action-btn--enabled'}`}>&#x2193;</button>
                     <button type="button" onClick={() => startEditChild(index)} title={t('plugin-admin-nav:edit')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 2px', color: 'var(--theme-elevation-500)' }}>✏️</button>
+                      className="admin-nav-submenus__child-action-btn admin-nav-submenus__child-action-btn--enabled">&#x270F;&#xFE0F;</button>
                     <button type="button" onClick={() => removeChild(index)} title={t('plugin-admin-nav:delete')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '0 2px', color: 'var(--theme-error-500)' }}>✕</button>
+                      className="admin-nav-submenus__child-action-btn admin-nav-submenus__child-action-btn--delete">&#x2715;</button>
                   </div>
                 </div>
               )}
 
               {/* Inline edit form */}
               {editingChildIndex === index && (
-                <div style={{
-                  padding: 8,
-                  borderRadius: 4,
-                  backgroundColor: 'var(--theme-elevation-0)',
-                  border: '1px solid var(--theme-elevation-200)',
-                }}>
-                  <div style={{ marginBottom: 6 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:labelField')}</label>
+                <div className="admin-nav-submenus__edit-form">
+                  <div className="admin-nav-submenus__edit-field">
+                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:labelField')}</label>
                     <input type="text" value={childDraft.label} onChange={(e) => setChildDraft({ ...childDraft, label: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} autoFocus placeholder={t('plugin-admin-nav:childLabelPlaceholder')} />
+                      className="admin-nav-submenus__edit-input" autoFocus placeholder={t('plugin-admin-nav:childLabelPlaceholder')} />
                   </div>
-                  <div style={{ marginBottom: 6 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:urlField')}</label>
+                  <div className="admin-nav-submenus__edit-field">
+                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:urlField')}</label>
                     <input type="text" value={childDraft.href} onChange={(e) => setChildDraft({ ...childDraft, href: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder={t('plugin-admin-nav:childUrlPlaceholder')} />
+                      className="admin-nav-submenus__edit-input" placeholder={t('plugin-admin-nav:childUrlPlaceholder')} />
                   </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>{t('plugin-admin-nav:childIconLabel')}</label>
+                  <div className="admin-nav-submenus__edit-field--last">
+                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:childIconLabel')}</label>
                     <input type="text" value={childDraft.icon} onChange={(e) => setChildDraft({ ...childDraft, icon: e.target.value })}
-                      style={{ ...fieldStyle, fontSize: 12, padding: '4px 6px' }} placeholder={t('plugin-admin-nav:childIconPlaceholder')} />
+                      className="admin-nav-submenus__edit-input" placeholder={t('plugin-admin-nav:childIconPlaceholder')} />
                   </div>
-                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={cancelEditChild}
-                      style={{ fontSize: 11, padding: '3px 10px', border: '1px solid var(--theme-elevation-200)', borderRadius: 4, background: 'none', cursor: 'pointer', color: 'var(--theme-text)' }}>
+                  <div className="admin-nav-submenus__edit-actions">
+                    <button type="button" onClick={cancelEditChild} className="admin-nav-submenus__edit-cancel">
                       {t('plugin-admin-nav:cancel')}
                     </button>
-                    <button type="button" onClick={saveChild}
-                      style={{ fontSize: 11, padding: '3px 10px', border: 'none', borderRadius: 4, backgroundColor: 'var(--theme-success-500)', color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+                    <button type="button" onClick={saveChild} className="admin-nav-submenus__edit-ok">
                       {t('plugin-admin-nav:ok')}
                     </button>
                   </div>
@@ -383,34 +317,11 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid var(--theme-elevation-200)',
-              borderRadius: 6,
-              background: 'none',
-              fontSize: 13,
-              cursor: 'pointer',
-              color: 'var(--theme-text)',
-            }}
-          >
+        <div className="admin-nav-modal__actions">
+          <button onClick={onCancel} className="admin-nav-btn--secondary">
             {t('plugin-admin-nav:cancel')}
           </button>
-          <button
-            onClick={handleSave}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderRadius: 6,
-              backgroundColor: 'var(--theme-success-500)',
-              color: 'white',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={handleSave} className="admin-nav-btn--primary">
             {t('plugin-admin-nav:save')}
           </button>
         </div>

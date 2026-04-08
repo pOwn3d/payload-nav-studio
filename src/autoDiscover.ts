@@ -263,7 +263,18 @@ export function autoDiscoverNav(config: Config): NavGroupConfig[] {
     // Skip the plugin's own preferences collection
     if (collection.slug === 'admin-nav-preferences') continue
 
-    const adminGroup = (collection.admin as Record<string, unknown>)?.group
+    const adminObj = collection.admin as Record<string, unknown> | undefined
+    const adminGroup = adminObj?.group
+    const adminCustom = adminObj?.custom as Record<string, unknown> | undefined
+
+    // Skip collections with admin.hidden: true — Payload 3 blocks their admin routes (→ 404).
+    // Plugin authors should use admin.custom.navHidden instead (see below).
+    if (adminObj?.hidden === true) continue
+
+    // admin.custom.navHidden: true — hides from nav by default but keeps the route working.
+    // Users can re-enable it in the Customizer and the link will work.
+    const navHidden = adminCustom?.navHidden === true
+
     const { key, title } = resolveGroup(collection.slug, adminGroup, 'Collections')
 
     const label = resolvePayloadLabel(
@@ -279,12 +290,22 @@ export function autoDiscoverNav(config: Config): NavGroupConfig[] {
       label,
       icon: guessIcon(collection.slug),
       matchPrefix: true,
+      ...(navHidden && { visible: false }),
     })
   }
 
   // ── 2. Globals ──
   for (const global of config.globals || []) {
-    const adminGroup = (global.admin as Record<string, unknown>)?.group
+    const adminObj = global.admin as Record<string, unknown> | undefined
+    const adminGroup = adminObj?.group
+    const adminCustom = adminObj?.custom as Record<string, unknown> | undefined
+
+    // Skip globals with admin.hidden: true — their admin routes return 404.
+    if (adminObj?.hidden === true) continue
+
+    // admin.custom.navHidden: true — hidden in nav but route stays accessible.
+    const navHidden = adminCustom?.navHidden === true
+
     const { key, title } = resolveGroup(global.slug, adminGroup, 'Configuration')
 
     const label: LocalizedString =
@@ -299,6 +320,7 @@ export function autoDiscoverNav(config: Config): NavGroupConfig[] {
       href: `/admin/globals/${global.slug}`,
       label,
       icon: guessIcon(global.slug),
+      ...(navHidden && { visible: false }),
     })
   }
 

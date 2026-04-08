@@ -5,13 +5,14 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>()
 
-// Periodic cleanup of expired entries
-setInterval(() => {
+// Periodic cleanup of expired entries — .unref() prevents blocking process exit
+const cleanupTimer = setInterval(() => {
   const now = Date.now()
   for (const [key, entry] of store) {
     if (now > entry.resetAt) store.delete(key)
   }
 }, 60_000)
+cleanupTimer.unref()
 
 export function rateLimit(
   key: string,

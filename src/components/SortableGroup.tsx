@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig } from '../types.js'
 import { resolveLabel } from '../utils.js'
+import { EyeIcon, EyeOffIcon, PencilIcon, TrashIcon, GripVerticalIcon } from './Icons.js'
 
 interface SortableGroupProps {
   group: NavGroupConfig
@@ -15,7 +16,7 @@ interface SortableGroupProps {
   onDelete: (groupId: string) => void
 }
 
-export const SortableGroup: React.FC<SortableGroupProps> = ({
+export const SortableGroup: React.FC<SortableGroupProps> = React.memo(({
   group,
   children,
   onToggleVisibility,
@@ -36,91 +37,51 @@ export const SortableGroup: React.FC<SortableGroupProps> = ({
 
   const resolvedTitle = resolveLabel(group.title, i18n.language, i18n.fallbackLanguage as string)
 
-  const style: React.CSSProperties = {
+  const isHidden = group.visible === false
+
+  const containerClasses = [
+    'admin-nav-sortable-group',
+    isHidden && 'admin-nav-sortable-group--hidden',
+    isDragging && 'admin-nav-sortable-group--dragging',
+  ].filter(Boolean).join(' ')
+
+  // DnD transform must remain inline (dynamic at runtime)
+  const dndStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    marginBottom: 12,
-    border: '1px solid var(--theme-elevation-200)',
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: group.visible === false ? 'var(--theme-elevation-50)' : 'var(--theme-elevation-0)',
-  }
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 12px',
-    backgroundColor: 'var(--theme-elevation-100)',
-    borderBottom: '1px solid var(--theme-elevation-200)',
-    cursor: 'grab',
-  }
-
-  const btnStyle: React.CSSProperties = {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    borderRadius: 4,
-    color: 'var(--theme-elevation-500)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
   }
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <div style={headerStyle} {...attributes} {...listeners}>
+    <div ref={setNodeRef} className={containerClasses} style={dndStyle}>
+      <div className="admin-nav-sortable-group__header" {...attributes} {...listeners}>
         {/* Drag handle */}
-        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-          <circle cx={9} cy={5} r={1} /><circle cx={9} cy={12} r={1} /><circle cx={9} cy={19} r={1} />
-          <circle cx={15} cy={5} r={1} /><circle cx={15} cy={12} r={1} /><circle cx={15} cy={19} r={1} />
-        </svg>
+        <GripVerticalIcon />
 
         {/* Group title */}
-        <span style={{
-          flex: 1,
-          fontWeight: 600,
-          fontSize: 13,
-          color: group.visible === false ? 'var(--theme-elevation-400)' : 'var(--theme-text)',
-          textDecoration: group.visible === false ? 'line-through' : 'none',
-        }}>
+        <span className={`admin-nav-sortable-group__title${isHidden ? ' admin-nav-sortable-group__title--hidden' : ''}`}>
           {resolvedTitle}
         </span>
 
         {/* Action buttons */}
         <button
-          style={btnStyle}
+          className="admin-nav-sortable-group__action-btn"
           onClick={(e) => { e.stopPropagation(); onToggleVisibility(group.id) }}
-          title={group.visible === false ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}
+          title={isHidden ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}
         >
-          {group.visible === false ? (
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="M1 1l22 22" />
-            </svg>
-          ) : (
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" /><circle cx={12} cy={12} r={3} />
-            </svg>
-          )}
+          {isHidden ? <EyeOffIcon /> : <EyeIcon />}
         </button>
-        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(group) }} title={t('plugin-admin-nav:edit')}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="M15 5l4 4" />
-          </svg>
+        <button className="admin-nav-sortable-group__action-btn" onClick={(e) => { e.stopPropagation(); onEdit(group) }} title={t('plugin-admin-nav:edit')}>
+          <PencilIcon />
         </button>
-        <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(group.id) }} title={t('plugin-admin-nav:delete')}>
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-          </svg>
+        <button className="admin-nav-sortable-group__action-btn" onClick={(e) => { e.stopPropagation(); onDelete(group.id) }} title={t('plugin-admin-nav:delete')}>
+          <TrashIcon />
         </button>
       </div>
 
       {/* Group items */}
-      <div style={{ padding: group.visible === false ? '4px 0' : '8px 0', opacity: group.visible === false ? 0.5 : 1 }}>
+      <div className={`admin-nav-sortable-group__items${isHidden ? ' admin-nav-sortable-group__items--hidden' : ''}`}>
         {children}
       </div>
     </div>
   )
-}
+})

@@ -93,11 +93,4 @@ export function getIconPath(name: string): string | undefined {
   return iconPaths[name]
 }
 
-/** Render an SVG icon as a React element string (for use in components) */
-export function renderIconSvg(name: string, size: number = 16): string {
-  const path = iconPaths[name]
-  if (!path) return ''
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.split(' M').map((p, i) => `<path d="${i > 0 ? 'M' : ''}${p}"/>`).join('')}</svg>`
-}
-
 export { iconPaths }

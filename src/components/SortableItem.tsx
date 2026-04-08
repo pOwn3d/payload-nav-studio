@@ -7,6 +7,7 @@ import { getIconPath } from '../icons.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavItemConfig } from '../types.js'
 import { resolveLabel } from '../utils.js'
+import { EyeIcon, EyeOffIcon, PencilIcon, XIcon, GripDotsIcon } from './Icons.js'
 
 interface SortableItemProps {
   item: NavItemConfig
@@ -27,7 +28,7 @@ const SmallIcon: React.FC<{ name: string }> = ({ name }) => {
   )
 }
 
-export const SortableItem: React.FC<SortableItemProps> = ({
+export const SortableItem: React.FC<SortableItemProps> = React.memo(({
   item,
   groupId,
   onToggleVisibility,
@@ -49,97 +50,54 @@ export const SortableItem: React.FC<SortableItemProps> = ({
 
   const resolvedLabel = resolveLabel(item.label, i18n.language, i18n.fallbackLanguage as string)
 
-  const style: React.CSSProperties = {
+  const isHidden = item.visible === false
+
+  const containerClasses = [
+    'admin-nav-sortable-item',
+    isDragging && 'admin-nav-sortable-item--dragging',
+    isHidden && 'admin-nav-sortable-item--invisible',
+  ].filter(Boolean).join(' ')
+
+  // DnD transform must remain inline (dynamic at runtime)
+  const dndStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : item.visible === false ? 0.5 : 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 12px',
-    margin: '2px 8px',
-    borderRadius: 6,
-    backgroundColor: isDragging ? 'var(--theme-elevation-150)' : 'transparent',
-    cursor: 'grab',
-  }
-
-  const btnStyle: React.CSSProperties = {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '2px',
-    borderRadius: 4,
-    color: 'var(--theme-elevation-400)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    opacity: 0.7,
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} className={containerClasses} style={dndStyle} {...attributes} {...listeners}>
       {/* Drag handle dots */}
-      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0, color: 'var(--theme-elevation-400)' }}>
-        <circle cx={9} cy={7} r={1} /><circle cx={9} cy={17} r={1} />
-        <circle cx={15} cy={7} r={1} /><circle cx={15} cy={17} r={1} />
-      </svg>
+      <GripDotsIcon />
 
       {/* Item icon */}
       {item.icon.startsWith('#') ? (
-        <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', backgroundColor: item.icon, flexShrink: 0 }} />
+        <span className="admin-nav-sortable-item__dot-icon" style={{ backgroundColor: item.icon }} />
       ) : (
         <SmallIcon name={item.icon} />
       )}
 
       {/* Label */}
-      <span style={{
-        flex: 1,
-        fontSize: 13,
-        fontWeight: 500,
-        color: item.visible === false ? 'var(--theme-elevation-400)' : 'var(--theme-text)',
-        textDecoration: item.visible === false ? 'line-through' : 'none',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
+      <span className={`admin-nav-sortable-item__label${isHidden ? ' admin-nav-sortable-item__label--hidden' : ''}`}>
         {resolvedLabel}
       </span>
 
       {/* Children count badge */}
       {item.children && item.children.length > 0 && (
-        <span style={{
-          fontSize: 10,
-          padding: '1px 5px',
-          borderRadius: 8,
-          backgroundColor: 'var(--theme-elevation-200)',
-          color: 'var(--theme-elevation-600)',
-        }}>
+        <span className="admin-nav-sortable-item__badge">
           {item.children.length}
         </span>
       )}
 
       {/* Action buttons */}
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupId, item.id) }} title={item.visible === false ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}>
-        {item.visible === false ? (
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M1 1l22 22" />
-          </svg>
-        ) : (
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" /><circle cx={12} cy={12} r={3} />
-          </svg>
-        )}
+      <button className="admin-nav-sortable-item__action-btn" onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupId, item.id) }} title={isHidden ? t('plugin-admin-nav:show') : t('plugin-admin-nav:hide')}>
+        {isHidden ? <EyeOffIcon size={12} /> : <EyeIcon size={12} />}
       </button>
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onEdit(item, groupId) }} title={t('plugin-admin-nav:edit')}>
-        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-        </svg>
+      <button className="admin-nav-sortable-item__action-btn" onClick={(e) => { e.stopPropagation(); onEdit(item, groupId) }} title={t('plugin-admin-nav:edit')}>
+        <PencilIcon size={12} />
       </button>
-      <button style={btnStyle} onClick={(e) => { e.stopPropagation(); onDelete(groupId, item.id) }} title={t('plugin-admin-nav:delete')}>
-        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 6L6 18" /><path d="M6 6l12 12" />
-        </svg>
+      <button className="admin-nav-sortable-item__action-btn" onClick={(e) => { e.stopPropagation(); onDelete(groupId, item.id) }} title={t('plugin-admin-nav:delete')}>
+        <XIcon />
       </button>
     </div>
   )
-}
+})

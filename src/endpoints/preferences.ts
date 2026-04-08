@@ -84,6 +84,10 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
           return Response.json({ error: 'navLayout.groups must be an array' }, { status: 400 })
         }
 
+        if (layout.groups.length > 50) {
+          return Response.json({ error: 'navLayout.groups exceeds maximum of 50 groups' }, { status: 400 })
+        }
+
         for (let i = 0; i < layout.groups.length; i++) {
           const group = layout.groups[i] as Record<string, unknown> | undefined
           if (!group || typeof group !== 'object') {
@@ -99,6 +103,56 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
           }
           if (!Array.isArray(group.items)) {
             return Response.json({ error: `navLayout.groups[${i}].items must be an array` }, { status: 400 })
+          }
+
+          if (group.items.length > 100) {
+            return Response.json({ error: `navLayout.groups[${i}].items exceeds maximum of 100 items` }, { status: 400 })
+          }
+
+          // Validate each item in the group
+          for (let j = 0; j < (group.items as unknown[]).length; j++) {
+            const item = (group.items as Record<string, unknown>[])[j]
+            if (!item || typeof item !== 'object') {
+              return Response.json({ error: `navLayout.groups[${i}].items[${j}] must be an object` }, { status: 400 })
+            }
+
+            // Validate item.id
+            if (typeof item.id !== 'string' || item.id.length === 0 || item.id.length > 100) {
+              return Response.json({ error: `navLayout.groups[${i}].items[${j}].id must be a non-empty string (max 100 chars)` }, { status: 400 })
+            }
+
+            // Validate item.href — must start with '/' or be empty, reject dangerous protocols
+            if (typeof item.href === 'string') {
+              const hrefLower = item.href.toLowerCase().trim()
+              if (hrefLower && !hrefLower.startsWith('/')) {
+                return Response.json({ error: `navLayout.groups[${i}].items[${j}].href must start with '/' or be empty` }, { status: 400 })
+              }
+              if (hrefLower.startsWith('javascript:') || hrefLower.startsWith('data:')) {
+                return Response.json({ error: `navLayout.groups[${i}].items[${j}].href contains a forbidden protocol` }, { status: 400 })
+              }
+            }
+
+            // Validate item.label — string or Record<string, string>, max 200 chars
+            if (item.label !== undefined) {
+              if (typeof item.label === 'string') {
+                if (item.label.length > 200) {
+                  return Response.json({ error: `navLayout.groups[${i}].items[${j}].label exceeds 200 chars` }, { status: 400 })
+                }
+              } else if (typeof item.label === 'object' && item.label !== null) {
+                for (const val of Object.values(item.label as Record<string, unknown>)) {
+                  if (typeof val === 'string' && val.length > 200) {
+                    return Response.json({ error: `navLayout.groups[${i}].items[${j}].label value exceeds 200 chars` }, { status: 400 })
+                  }
+                }
+              }
+            }
+
+            // Validate item.icon — string, max 50 chars if present
+            if (item.icon !== undefined) {
+              if (typeof item.icon !== 'string' || item.icon.length > 50) {
+                return Response.json({ error: `navLayout.groups[${i}].items[${j}].icon must be a string (max 50 chars)` }, { status: 400 })
+              }
+            }
           }
         }
       }

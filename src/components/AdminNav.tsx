@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useNavPreferences } from '../hooks/useNavPreferences.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
+import { StyleInjector } from './StyleInjector.js'
 import { getIconPath } from '../icons.js'
 import type { NavItemConfig, NavGroupConfig } from '../types.js'
 import { resolveLabel } from '../utils.js'
@@ -28,7 +29,7 @@ const NavIcon: React.FC<{ name: string; size?: number }> = ({ name, size = 16 })
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ flexShrink: 0 }}
+      className="admin-nav__svg-icon"
     >
       {paths.map((d, i) => (
         <path key={i} d={d} />
@@ -52,98 +53,9 @@ function isItemActive(item: NavItemConfig, fullUrl: string, pathname: string): b
   return pathname === item.href
 }
 
-// ── Styles ──
-
-const styles = {
-  container: {
-    paddingBottom: 12,
-    marginBottom: 8,
-    borderBottom: '1px solid var(--theme-elevation-200)',
-  } as React.CSSProperties,
-  dashboardLink: (isActive: boolean) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '8px 16px',
-    margin: '0 8px 8px',
-    borderRadius: 6,
-    borderLeft: isActive ? '3px solid var(--bd-nav-active-border, var(--theme-elevation-500))' : '3px solid transparent',
-    backgroundColor: isActive ? 'var(--bd-nav-active-bg, var(--theme-elevation-100))' : 'transparent',
-    color: isActive ? 'var(--bd-nav-active-text, var(--theme-text))' : 'var(--theme-text)',
-    fontWeight: 600,
-    fontSize: 13,
-    textDecoration: 'none',
-    transition: 'background-color 0.15s, color 0.15s',
-  } as React.CSSProperties),
-  groupTitle: {
-    padding: '4px 16px',
-    fontSize: 10,
-    fontWeight: 600,
-    letterSpacing: 0.5,
-    color: 'var(--bd-nav-group-label, var(--theme-elevation-500))',
-  } as React.CSSProperties,
-  groupContainer: {
-    marginBottom: 6,
-  } as React.CSSProperties,
-  itemLink: (isActive: boolean, hasActiveChild: boolean) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '7px 16px',
-    margin: '2px 8px',
-    borderRadius: 6,
-    borderLeft: (isActive || hasActiveChild) ? '3px solid var(--bd-nav-active-border, var(--theme-elevation-500))' : '3px solid transparent',
-    backgroundColor: isActive ? 'var(--bd-nav-active-bg, var(--theme-elevation-100))' : 'transparent',
-    color: (isActive || hasActiveChild) ? 'var(--bd-nav-active-text, var(--theme-text))' : 'var(--theme-text)',
-    fontWeight: (isActive || hasActiveChild) ? 600 : 500,
-    fontSize: 13,
-    textDecoration: 'none',
-    transition: 'background-color 0.15s, color 0.15s',
-  } as React.CSSProperties),
-  childLink: (isActive: boolean) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '5px 16px 5px 36px',
-    margin: '1px 8px',
-    borderRadius: 6,
-    borderLeft: isActive ? '3px solid var(--bd-nav-active-border, var(--theme-elevation-500))' : '3px solid transparent',
-    backgroundColor: isActive ? 'var(--bd-nav-active-bg, var(--theme-elevation-100))' : 'transparent',
-    color: isActive ? 'var(--bd-nav-active-text, var(--theme-text))' : 'var(--theme-elevation-500)',
-    fontWeight: isActive ? 600 : 400,
-    fontSize: 12,
-    textDecoration: 'none',
-    transition: 'background-color 0.15s, color 0.15s',
-  } as React.CSSProperties),
-  customizeLink: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: '6px 16px',
-    margin: '8px 8px 0',
-    borderRadius: 6,
-    fontSize: 11,
-    color: 'var(--theme-elevation-500)',
-    textDecoration: 'none',
-    transition: 'color 0.15s',
-    cursor: 'pointer',
-    border: 'none',
-    background: 'none',
-    width: '100%',
-  } as React.CSSProperties,
-} as const
-
 /** A single color dot icon (for ticket status filters) */
 const DotIcon: React.FC<{ color: string }> = ({ color }) => (
-  <span style={{
-    display: 'inline-block',
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    backgroundColor: color,
-    flexShrink: 0,
-  }} />
+  <span className="admin-nav__dot-icon" style={{ backgroundColor: color }} />
 )
 
 /** Render a child nav item icon — either a dot or SVG */
@@ -213,19 +125,17 @@ const AdminNav: React.FC = () => {
 
   return (
     <>
-      {/* Hide default Payload nav groups that render alongside admin-nav.
-          Targets CSS-module classed siblings while preserving afterNavLinks plugin sections. */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        [data-admin-nav] ~ * { display: none !important; }
-      ` }} />
-      <div data-admin-nav="" style={{
-      ...styles.container,
-      opacity: isLoaded ? 1 : 0,
-      transition: 'opacity 0.15s ease-in',
-      minHeight: isLoaded ? undefined : 200,
-    }}>
+    <StyleInjector />
+    <div
+      data-admin-nav=""
+      className={`admin-nav${isLoaded ? '' : ' admin-nav--loading'}`}
+    >
       {/* Dashboard link */}
-      <Link href="/admin" prefetch={false} style={styles.dashboardLink(isDashboard)}>
+      <Link
+        href="/admin"
+        prefetch={false}
+        className={`admin-nav__dashboard-link${isDashboard ? ' admin-nav__dashboard-link--active' : ''}`}
+      >
         <NavIcon name="home" />
         {t('plugin-admin-nav:dashboard')}
       </Link>
@@ -234,17 +144,10 @@ const AdminNav: React.FC = () => {
         const isCollapsed = collapsed[group.id]
 
         return (
-          <div key={group.id} style={styles.groupContainer}>
+          <div key={group.id} className="admin-nav__group">
             {/* Group header */}
             <div
-              style={{
-                ...styles.groupTitle,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                userSelect: 'none',
-              }}
+              className="admin-nav__group-title"
               onClick={() => toggleGroup(group.id)}
             >
               <span>{resolveLabel(group.title, lang, fallbackLang)}</span>
@@ -257,10 +160,7 @@ const AdminNav: React.FC = () => {
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{
-                  transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0)',
-                  transition: 'transform 0.15s',
-                }}
+                className={`admin-nav__group-chevron${isCollapsed ? ' admin-nav__group-chevron--collapsed' : ''}`}
               >
                 <path d="M6 9l6 6 6-6" />
               </svg>
@@ -271,9 +171,15 @@ const AdminNav: React.FC = () => {
               const isActive = isItemActive(item, fullUrl, pathname)
               const hasActiveChild = item.children?.some((child) => fullUrl === child.href) ?? false
 
+              const itemClasses = [
+                'admin-nav__item-link',
+                isActive && 'admin-nav__item-link--active',
+                hasActiveChild && 'admin-nav__item-link--has-active-child',
+              ].filter(Boolean).join(' ')
+
               return (
                 <React.Fragment key={item.id}>
-                  <Link href={item.href} prefetch={false} style={styles.itemLink(isActive, hasActiveChild)}>
+                  <Link href={item.href} prefetch={false} className={itemClasses}>
                     <NavIcon name={item.icon} />
                     {resolveLabel(item.label, lang, fallbackLang)}
                   </Link>
@@ -282,7 +188,12 @@ const AdminNav: React.FC = () => {
                   {item.children?.filter((c) => c.visible !== false).map((child) => {
                     const isChildActive = fullUrl === child.href
                     return (
-                      <Link key={child.id} href={child.href} prefetch={false} style={styles.childLink(isChildActive)}>
+                      <Link
+                        key={child.id}
+                        href={child.href}
+                        prefetch={false}
+                        className={`admin-nav__child-link${isChildActive ? ' admin-nav__child-link--active' : ''}`}
+                      >
                         <ChildIcon icon={child.icon} />
                         {resolveLabel(child.label, lang, fallbackLang)}
                       </Link>
@@ -296,7 +207,7 @@ const AdminNav: React.FC = () => {
       })}
 
       {/* Customize button */}
-      <Link href="/admin/nav-customizer" prefetch={false} style={styles.customizeLink}>
+      <Link href="/admin/nav-customizer" prefetch={false} className="admin-nav__customize-link">
         <NavIcon name="settings" size={12} />
         {t('plugin-admin-nav:customize')}
       </Link>

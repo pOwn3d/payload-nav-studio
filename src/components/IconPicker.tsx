@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { getIconNames, getIconPath } from '../icons.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 
@@ -23,18 +23,7 @@ const IconButton: React.FC<{
     <button
       onClick={onClick}
       title={name}
-      style={{
-        width: 36,
-        height: 36,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: isSelected ? '2px solid var(--theme-success-500)' : '1px solid var(--theme-elevation-200)',
-        borderRadius: 6,
-        backgroundColor: isSelected ? 'var(--theme-success-100)' : 'var(--theme-elevation-0)',
-        cursor: 'pointer',
-        color: 'var(--theme-text)',
-      }}
+      className={`admin-nav-icon-picker__icon-btn${isSelected ? ' admin-nav-icon-picker__icon-btn--selected' : ''}`}
     >
       <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {paths.map((d, i) => <path key={i} d={d} />)}
@@ -46,6 +35,7 @@ const IconButton: React.FC<{
 export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose }) => {
   const { t } = usePluginTranslation()
   const [search, setSearch] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
   const allIcons = useMemo(() => getIconNames(), [])
 
   const filtered = useMemo(() => {
@@ -54,64 +44,46 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
     return allIcons.filter((name) => name.includes(q))
   }, [allIcons, search])
 
+  // Close on click outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
   return (
-    <div style={{
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      zIndex: 100,
-      width: 300,
-      maxHeight: 320,
-      backgroundColor: 'var(--theme-elevation-0)',
-      border: '1px solid var(--theme-elevation-200)',
-      borderRadius: 8,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div ref={containerRef} className="admin-nav-icon-picker">
       {/* Search */}
-      <div style={{ padding: 8, borderBottom: '1px solid var(--theme-elevation-200)' }}>
+      <div className="admin-nav-icon-picker__search">
         <input
           type="text"
           placeholder={t('plugin-admin-nav:searchIcon')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
-          style={{
-            width: '100%',
-            padding: '6px 8px',
-            border: '1px solid var(--theme-elevation-200)',
-            borderRadius: 4,
-            fontSize: 12,
-            backgroundColor: 'var(--theme-input-bg)',
-            color: 'var(--theme-text)',
-            outline: 'none',
-          }}
+          className="admin-nav-icon-picker__search-input"
         />
       </div>
 
       {/* Color dot option */}
-      <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--theme-elevation-200)' }}>
-        <label style={{ fontSize: 11, color: 'var(--theme-elevation-500)', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div className="admin-nav-icon-picker__dot-option">
+        <label className="admin-nav-icon-picker__dot-label">
           {t('plugin-admin-nav:dotColor')}
           <input
             type="color"
             value={value.startsWith('#') ? value : '#00E5FF'}
             onChange={(e) => onChange(e.target.value)}
-            style={{ width: 24, height: 24, border: 'none', padding: 0, cursor: 'pointer' }}
+            className="admin-nav-icon-picker__color-input"
           />
         </label>
       </div>
 
       {/* Icon grid */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: 8,
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 4,
-      }}>
+      <div className="admin-nav-icon-picker__grid">
         {filtered.map((name) => (
           <IconButton
             key={name}
@@ -121,25 +93,15 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
           />
         ))}
         {filtered.length === 0 && (
-          <div style={{ padding: 12, fontSize: 12, color: 'var(--theme-elevation-400)' }}>
+          <div className="admin-nav-icon-picker__no-results">
             {t('plugin-admin-nav:noIconFound')}
           </div>
         )}
       </div>
 
       {/* Close */}
-      <div style={{ padding: 4, borderTop: '1px solid var(--theme-elevation-200)', textAlign: 'right' }}>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: 11,
-            color: 'var(--theme-elevation-500)',
-            cursor: 'pointer',
-            padding: '4px 8px',
-          }}
-        >
+      <div className="admin-nav-icon-picker__footer">
+        <button onClick={onClose} className="admin-nav-icon-picker__close-btn">
           {t('plugin-admin-nav:close')}
         </button>
       </div>
