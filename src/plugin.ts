@@ -11,7 +11,7 @@
  * - Auto-discovery: generates nav from collections/globals/views if no defaultNav
  *
  * Usage:
- *   import { adminNavPlugin } from '@consilioweb/admin-nav'
+ *   import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
  *
  *   // Minimal — auto-discovers nav from Payload config
  *   export default buildConfig({
@@ -39,10 +39,11 @@ import {
   createSavePreferencesHandler,
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
+import { createBadgesHandler } from './endpoints/badges.js'
 import { translations } from './translations/index.js'
 import { autoDiscoverNav } from './autoDiscover.js'
 import { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
-import { computeNavFingerprint } from './utils.js'
+import { computeNavFingerprint, dedupeNavItems } from './utils.js'
 
 /**
  * Filter navigation groups/items based on user permissions.
@@ -115,8 +116,11 @@ export const adminNavPlugin =
     const userCollectionSlug = safeConfig.userCollectionSlug ?? 'users'
     const basePath = safeConfig.endpointBasePath ?? '/admin-nav'
 
-    // Resolve defaultNav: use provided config or auto-discover from Payload config
-    const defaultNav = safeConfig.defaultNav ?? autoDiscoverNav(incomingConfig)
+    // Resolve defaultNav: use provided config or auto-discover from Payload config.
+    // Deduplicate items that may have been declared in multiple groups
+    // (warns in console on duplicates — keeps the first occurrence).
+    const rawDefaultNav = safeConfig.defaultNav ?? autoDiscoverNav(incomingConfig)
+    const defaultNav = dedupeNavItems(rawDefaultNav)
 
     // Compute a structural fingerprint of the defaultNav for preference migration.
     // When the nav structure changes, stored preferences with an old version
@@ -153,6 +157,11 @@ export const adminNavPlugin =
         method: 'delete' as const,
         handler: createResetPreferencesHandler(collectionSlug),
       },
+      {
+        path: `${basePath}/badges`,
+        method: 'get' as const,
+        handler: createBadgesHandler(defaultNav),
+      },
     ]
 
     // 4. Inject AdminNav into beforeNavLinks
@@ -160,7 +169,7 @@ export const adminNavPlugin =
     if (!config.admin.components) config.admin.components = {}
 
     // Replace existing beforeNavLinks with our AdminNav
-    const navComponent = safeConfig.navComponentPath ?? '@consilioweb/admin-nav/client#AdminNav'
+    const navComponent = safeConfig.navComponentPath ?? '@consilioweb/payload-admin-nav/client#AdminNav'
     const existingBeforeNav = config.admin.components.beforeNavLinks || []
     config.admin.components.beforeNavLinks = [
       navComponent,
@@ -181,7 +190,7 @@ export const adminNavPlugin =
     if (safeConfig.addCustomizerView !== false) {
       if (!config.admin.components.views) config.admin.components.views = {}
       ;(config.admin.components.views as Record<string, unknown>)['nav-customizer'] = {
-        Component: '@consilioweb/admin-nav/views#NavCustomizerView',
+        Component: '@consilioweb/payload-admin-nav/views#NavCustomizerView',
         path: '/nav-customizer',
       }
     }
@@ -206,11 +215,26 @@ export const adminNavPlugin =
             // Filter nav items based on user permissions to avoid structure enumeration
             const filteredNav = await filterNavByPermissions(defaultNav, req)
 
+            // Detect whether any badge resolver is configured so the client
+            // can decide to start the live polling. Functions are not
+            // serializable so we only ship a boolean flag.
+            const hasBadges = defaultNav.some(
+              (g) =>
+                typeof g.groupBadge === 'function' ||
+                (g.items ?? []).some((it) =>
+                  (it.children ?? []).some(
+                    (c) => typeof (c as { childBadge?: unknown }).childBadge === 'function',
+                  ),
+                ),
+            )
+
             return Response.json({
               defaultNav: filteredNav,
               navVersion,
               afterNav: safeConfig.afterNav || [],
               basePath: `/api${basePath}`,
+              hasBadges,
+              navFooterSlot: safeConfig.navFooterSlot ?? null,
             })
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Internal server error'

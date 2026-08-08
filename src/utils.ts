@@ -1,4 +1,4 @@
-import type { NavGroupConfig } from './types.js'
+import type { NavGroupConfig, NavItemConfig } from './types.js'
 
 /**
  * Check if a label is a multi-language record.
@@ -53,4 +53,36 @@ export function computeNavFingerprint(groups: NavGroupConfig[]): number {
   }
   // Return positive integer
   return hash >>> 0
+}
+
+/**
+ * Deduplicate nav items by `id` across groups.
+ *
+ * If the same item id appears in multiple groups (typically a config bug),
+ * keep the first occurrence and drop subsequent ones. Logs a `console.warn`
+ * for each duplicate so the consumer can fix the source config.
+ *
+ * Returns a new array; never mutates the input.
+ */
+export function dedupeNavItems(groups: NavGroupConfig[]): NavGroupConfig[] {
+  const seen = new Set<string>()
+  const result: NavGroupConfig[] = []
+
+  for (const group of groups) {
+    const items: NavItemConfig[] = []
+    for (const item of group.items ?? []) {
+      if (seen.has(item.id)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[admin-nav] Duplicate item id "${item.id}" detected in group "${group.id}" — keeping the first occurrence only.`,
+        )
+        continue
+      }
+      seen.add(item.id)
+      items.push(item)
+    }
+    result.push({ ...group, items })
+  }
+
+  return result
 }

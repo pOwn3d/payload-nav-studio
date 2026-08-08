@@ -8,8 +8,8 @@
   <br><br>
 
   <!-- Badges -->
-  <a href="https://www.npmjs.com/package/@consilioweb/admin-nav"><img src="https://img.shields.io/npm/v/@consilioweb/admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@consilioweb/admin-nav"><img src="https://img.shields.io/npm/dw/@consilioweb/admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/@consilioweb/payload-admin-nav"><img src="https://img.shields.io/npm/v/@consilioweb/payload-admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@consilioweb/payload-admin-nav"><img src="https://img.shields.io/npm/dw/@consilioweb/payload-admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
   <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
   <img src="https://img.shields.io/badge/Drag%20%26%20Drop-dnd--kit-8B5CF6?style=for-the-badge" alt="dnd-kit">
   <img src="https://img.shields.io/badge/Icons-70%2B%20SVG-10B981?style=for-the-badge" alt="70+ Icons">
@@ -41,14 +41,14 @@
 >
 > And ensure all `@consilioweb/*` packages are in `transpilePackages` in your `next.config.ts`:
 > ```ts
-> transpilePackages: ['@consilioweb/seo-analyzer', '@consilioweb/admin-nav', /* ...other @consilioweb packages */],
+> transpilePackages: ['@consilioweb/seo-analyzer', '@consilioweb/payload-admin-nav', /* ...other @consilioweb packages */],
 > ```
 >
 > ✅ **Next.js 15** works without any workaround.
 
 ## About
 
-> **@consilioweb/admin-nav** — A fully customizable admin sidebar navigation plugin for Payload CMS 3. Drag & drop reordering, per-user preferences stored in the database, 70+ built-in SVG icons, nested sub-items, i18n support (FR/EN with multi-language labels), and a dedicated admin view to customize everything visually.
+> **@consilioweb/payload-admin-nav** — A fully customizable admin sidebar navigation plugin for Payload CMS 3. Drag & drop reordering, per-user preferences stored in the database, 70+ built-in SVG icons, nested sub-items, i18n support (FR/EN with multi-language labels), and a dedicated admin view to customize everything visually.
 
 <table>
   <tr>
@@ -101,7 +101,7 @@
 
 ## Overview
 
-`@consilioweb/admin-nav` replaces the default Payload CMS admin sidebar with a fully customizable navigation system. Each admin user gets their own layout preferences, persisted in the database. The plugin provides a visual editor (`/admin/nav-customizer`) where users can drag & drop groups and items, toggle visibility, edit labels and icons, create custom entries, and organize nested sub-menus — all without touching code.
+`@consilioweb/payload-admin-nav` replaces the default Payload CMS admin sidebar with a fully customizable navigation system. Each admin user gets their own layout preferences, persisted in the database. The plugin provides a visual editor (`/admin/nav-customizer`) where users can drag & drop groups and items, toggle visibility, edit labels and icons, create custom entries, and organize nested sub-menus — all without touching code.
 
 ### Screenshots
 
@@ -225,17 +225,45 @@ The plugin adds a dedicated view at `/admin/nav-customizer` with:
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
+## ⚠️ Migration from `@consilioweb/admin-nav`
+
+This package has been renamed from `@consilioweb/admin-nav` to `@consilioweb/payload-admin-nav`.
+
+**Automatic migration (recommended):**
+
+```bash
+npx @consilioweb/migrate
+```
+
+This will update your `package.json` and all imports automatically.
+
+**Manual migration:**
+
+```bash
+npm uninstall @consilioweb/admin-nav
+npm install @consilioweb/payload-admin-nav
+```
+
+Then update your imports:
+
+```diff
+- import { adminNavPlugin } from '@consilioweb/admin-nav'
++ import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
+```
+
+---
+
 ## Installation
 
 ```bash
-pnpm add @consilioweb/admin-nav
+pnpm add @consilioweb/payload-admin-nav
 ```
 
 Or with npm/yarn:
 
 ```bash
-npm install @consilioweb/admin-nav
-yarn add @consilioweb/admin-nav
+npm install @consilioweb/payload-admin-nav
+yarn add @consilioweb/payload-admin-nav
 ```
 
 > **Note:** `@dnd-kit` is bundled into the client bundle — you do **not** need to install it separately.
@@ -260,7 +288,7 @@ Add the plugin to your `payload.config.ts`:
 
 ```ts
 import { buildConfig } from 'payload'
-import { adminNavPlugin } from '@consilioweb/admin-nav'
+import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
 
 export default buildConfig({
   // ... your existing config
@@ -306,7 +334,7 @@ That's it. The plugin will automatically:
 If you don't provide a `defaultNav`, the plugin **auto-discovers** your Payload config and builds the navigation automatically:
 
 ```ts
-import { adminNavPlugin } from '@consilioweb/admin-nav'
+import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
 
 export default buildConfig({
   plugins: [
@@ -326,7 +354,7 @@ Auto-discovery will:
 You can also use `autoDiscoverNav` programmatically to generate a base config, then customize it:
 
 ```ts
-import { adminNavPlugin, autoDiscoverNav } from '@consilioweb/admin-nav'
+import { adminNavPlugin, autoDiscoverNav } from '@consilioweb/payload-admin-nav'
 
 const baseNav = autoDiscoverNav(config)
 // Modify baseNav as needed...
@@ -364,7 +392,7 @@ adminNavPlugin({
 | `userCollectionSlug` | `string` | `'users'` | Slug de la collection utilisateurs pour la relation |
 | `endpointBasePath` | `string` | `'/admin-nav'` | Chemin de base pour les endpoints API |
 | `addCustomizerView` | `boolean` | `true` | Ajouter la vue admin Nav Customizer à `/admin/nav-customizer` |
-| `navComponentPath` | `string` | `'@consilioweb/admin-nav/client#AdminNav'` | Surcharger le chemin du composant AdminNav (pour les installations `file:` ou `link:`) |
+| `navComponentPath` | `string` | `'@consilioweb/payload-admin-nav/client#AdminNav'` | Surcharger le chemin du composant AdminNav (pour les installations `file:` ou `link:`) |
 
 ### Types
 
@@ -535,7 +563,7 @@ The item and group editors include a **Multi-lang** toggle that lets users switc
 ### Utilities
 
 ```ts
-import { resolveLabel, isMultiLang } from '@consilioweb/admin-nav'
+import { resolveLabel, isMultiLang } from '@consilioweb/payload-admin-nav'
 
 // Resolve a label to the current language
 resolveLabel({ fr: 'Pages', en: 'Pages' }, 'fr')        // 'Pages'
@@ -552,7 +580,7 @@ isMultiLang('plain')                     // false
 Type-safe wrapper around Payload's `useTranslation` that accepts plugin custom keys:
 
 ```ts
-import { usePluginTranslation } from '@consilioweb/admin-nav/client'
+import { usePluginTranslation } from '@consilioweb/payload-admin-nav/client'
 
 function MyComponent() {
   const { t, i18n } = usePluginTranslation()
@@ -596,7 +624,7 @@ For color dots instead of icons, use a hex color:
 ### Programmatic Access
 
 ```ts
-import { getIconNames, getIconPath, iconPaths } from '@consilioweb/admin-nav'
+import { getIconNames, getIconPath, iconPaths } from '@consilioweb/payload-admin-nav'
 
 // Get all available icon names
 const names = getIconNames() // ['home', 'file-text', ...]
@@ -627,7 +655,7 @@ All endpoints are prefixed with the configured `endpointBasePath` (default: `/ad
 For custom components that need to interact with nav preferences:
 
 ```ts
-import { useNavPreferences } from '@consilioweb/admin-nav/client'
+import { useNavPreferences } from '@consilioweb/payload-admin-nav/client'
 
 function MyComponent() {
   const { layout, isLoaded, isSaving, isCustom, save, reset, reload } = useNavPreferences()
@@ -706,14 +734,14 @@ import {
   iconPaths,
   resolveLabel,
   isMultiLang,
-} from '@consilioweb/admin-nav'
+} from '@consilioweb/payload-admin-nav'
 import type {
   NavItemConfig,
   NavGroupConfig,
   NavLayout,
   AdminNavPluginConfig,
   LocalizedString,
-} from '@consilioweb/admin-nav'
+} from '@consilioweb/payload-admin-nav'
 
 // Client components — React components for Payload admin UI
 import {
@@ -728,11 +756,11 @@ import {
   usePluginTranslation,
   resolveLabel,
   isMultiLang,
-} from '@consilioweb/admin-nav/client'
-import type { PluginAdminNavTranslationKeys } from '@consilioweb/admin-nav/client'
+} from '@consilioweb/payload-admin-nav/client'
+import type { PluginAdminNavTranslationKeys } from '@consilioweb/payload-admin-nav/client'
 
 // Server views — admin views wrapped in DefaultTemplate
-import { NavCustomizerView } from '@consilioweb/admin-nav/views'
+import { NavCustomizerView } from '@consilioweb/payload-admin-nav/views'
 ```
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
@@ -752,7 +780,7 @@ import { NavCustomizerView } from '@consilioweb/admin-nav/views'
 2. Uninstall the package:
 
 ```bash
-pnpm remove @consilioweb/admin-nav
+pnpm remove @consilioweb/payload-admin-nav
 ```
 
 3. Regenerate the importmap:

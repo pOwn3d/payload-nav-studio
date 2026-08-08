@@ -7,14 +7,18 @@ export {
   createSavePreferencesHandler,
   createResetPreferencesHandler,
 } from './endpoints/preferences.js'
+export { createBadgesHandler } from './endpoints/badges.js'
 export { getIconNames, getIconPath, iconPaths } from './icons.js'
-export { resolveLabel, isMultiLang, computeNavFingerprint } from './utils.js'
+export { resolveLabel, isMultiLang, computeNavFingerprint, dedupeNavItems } from './utils.js'
 
 // Types
 export type {
   LocalizedString,
   NavItemConfig,
+  NavChildConfig,
   NavGroupConfig,
   NavLayout,
   AdminNavPluginConfig,
+  NavBadgeFn,
+  NavBadgesPayload,
 } from './types.js'

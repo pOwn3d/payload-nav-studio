@@ -54,6 +54,8 @@ export const en = {
     // Navigation
     dashboard: 'Dashboard',
     customize: 'Customize',
+    collapseSidebar: 'Collapse menu',
+    expandSidebar: 'Expand menu',
 
     // Checkboxes
     matchPrefix: 'Match prefix (active if URL starts with href)',
@@ -102,5 +104,15 @@ export const en = {
     discoverError: 'Error discovering available items',
     discoverMergeTitle: '{{count}} new items found',
     discoverMergeHint: 'The following items were added to your navigation. Save to keep them.',
+
+    // Top filter / jump-to
+    jumpTo: 'Jump to…',
+    jumpToShortcut: '⌘K',
+
+    // User availability statuses
+    available: 'Available',
+    busy: 'Busy',
+    away: 'Away',
+    offline: 'Offline',
   },
 }

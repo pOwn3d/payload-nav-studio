@@ -39,6 +39,8 @@ export type PluginAdminNavTranslationKeys =
   | 'plugin-admin-nav:newLink'
   | 'plugin-admin-nav:dashboard'
   | 'plugin-admin-nav:customize'
+  | 'plugin-admin-nav:collapseSidebar'
+  | 'plugin-admin-nav:expandSidebar'
   | 'plugin-admin-nav:matchPrefix'
   | 'plugin-admin-nav:defaultCollapsed'
   | 'plugin-admin-nav:searchIcon'
@@ -69,3 +71,11 @@ export type PluginAdminNavTranslationKeys =
   | 'plugin-admin-nav:discoverError'
   | 'plugin-admin-nav:discoverMergeTitle'
   | 'plugin-admin-nav:discoverMergeHint'
+  // Top filter / jump-to
+  | 'plugin-admin-nav:jumpTo'
+  | 'plugin-admin-nav:jumpToShortcut'
+  // User profile / availability
+  | 'plugin-admin-nav:available'
+  | 'plugin-admin-nav:busy'
+  | 'plugin-admin-nav:away'
+  | 'plugin-admin-nav:offline'

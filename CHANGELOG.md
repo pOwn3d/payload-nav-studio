@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to `@consilioweb/admin-nav` will be documented in this file.
+All notable changes to `@consilioweb/payload-admin-nav` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Changed
+- **Visual refonte — Design System "ConsilioWEB v2"** — Sidebar navigation rebuilt to match the v2 mockups:
+  - New brand header with logo (ink square + teal ring) + "ConsilioWEB" wordmark and a collapse toggle.
+  - "Tableau de bord" promoted to a primary item (blue resting accent, ink active state).
+  - Section counters use the warm cream pill (`--nav-count-*`); items keep the soft-ink active background + left accent bar; Tickets sub-tree keeps colored status dots + mono badges; presence dot preserved.
+  - Lighter SVG icons (17px, stroke 1.9) and refined spacing, aligned to Hanken Grotesk / JetBrains Mono.
+  - New design tokens: `--nav-panel`, `--nav-dash`, `--nav-logo-ink`, `--nav-logo-ring`, `--nav-count-bg`, `--nav-count-text` (light + dark).
+
+### Added
+- **Collapsible 72px rail** — Persistent icon-only mode (per-browser via `localStorage`). Shrinks the host Payload nav column by overriding `--nav-width` through `html:has(.admin-nav--rail)`. Active state, badges (amber dot) and presence (green dot) are preserved as corner overlays; the user avatar is pinned to the bottom (compact `NavUserProfile`, availability popover kept).
+- Translation keys `collapseSidebar` / `expandSidebar` (fr + en).
 
 ## [0.12.0] - 2026-04-08
 

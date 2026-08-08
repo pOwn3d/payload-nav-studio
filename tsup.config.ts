@@ -14,8 +14,8 @@ const baseExternals = [
   'next',
   'next/navigation',
   'next/link',
-  '@consilioweb/admin-nav',
-  '@consilioweb/admin-nav/client',
+  '@consilioweb/payload-admin-nav',
+  '@consilioweb/payload-admin-nav/client',
 ]
 
 // Clean dist once before parallel builds start
@@ -76,6 +76,8 @@ export default defineConfig([
       'src/components/IconPicker.tsx',
       'src/components/Icons.tsx',
       'src/components/StyleInjector.tsx',
+      'src/components/NavUserProfile.tsx',
+      'src/components/NavFooterSlot.tsx',
       'src/hooks/useNavPreferences.ts',
       'src/hooks/usePluginTranslation.ts',
       'src/icons.ts',

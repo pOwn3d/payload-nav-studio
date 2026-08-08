@@ -54,6 +54,8 @@ export const fr = {
     // Navigation
     dashboard: 'Tableau de bord',
     customize: 'Personnaliser',
+    collapseSidebar: 'Réduire le menu',
+    expandSidebar: 'Déployer le menu',
 
     // Checkboxes
     matchPrefix: "Match prefix (actif si l'URL commence par le href)",
@@ -102,5 +104,15 @@ export const fr = {
     discoverError: 'Erreur lors de la découverte des items',
     discoverMergeTitle: '{{count}} nouveaux items trouvés',
     discoverMergeHint: 'Les items suivants ont été ajoutés à votre navigation. Sauvegardez pour les conserver.',
+
+    // Top filter / jump-to
+    jumpTo: 'Aller à…',
+    jumpToShortcut: '⌘K',
+
+    // User availability statuses
+    available: 'Disponible',
+    busy: 'Occupé',
+    away: 'Absent',
+    offline: 'Hors ligne',
   },
 }
