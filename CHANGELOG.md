@@ -5,6 +5,19 @@ All notable changes to `@consilioweb/payload-admin-nav` will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-09-07
+
+### Fixed
+
+- **`endpointBasePath` finally does something.** The option moved the endpoint
+  registration, but `AdminNav`, `NavCustomizer` and `useNavPreferences` all called
+  `/api/admin-nav` literally, so setting it registered the routes somewhere else and
+  the sidebar stopped loading — the option was documented, shipped, and dead. The
+  resolved prefix now reaches the client two ways: `AdminNav` receives it as a
+  `clientProps.basePath`, and the customizer view reads it from
+  `config.custom.adminNav.basePath`, which the plugin now publishes. Hosts on the
+  default prefix are unaffected. Four regression tests cover the option end to end.
+
 ## [0.16.0] - 2026-09-07
 
 Admin-only endpoints, permission filtering that actually runs, a white-label sidebar header, and an ESM-only package.

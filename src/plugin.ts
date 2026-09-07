@@ -286,11 +286,17 @@ export const adminNavPlugin =
     if (!config.admin) config.admin = {}
     if (!config.admin.components) config.admin.components = {}
 
-    // Replace existing beforeNavLinks with our AdminNav
+    // Replace existing beforeNavLinks with our AdminNav.
+    //
+    // basePath travels as a clientProp rather than being fetched: the client
+    // would otherwise have to call an endpoint to learn where the endpoints
+    // are. Until 0.16.0 it simply hardcoded `/api/admin-nav`, which made
+    // `endpointBasePath` a dead option — setting it registered the routes
+    // elsewhere and the sidebar stopped loading.
     const navComponent = safeConfig.navComponentPath ?? '@consilioweb/payload-admin-nav/client#AdminNav'
     const existingBeforeNav = config.admin.components.beforeNavLinks || []
     config.admin.components.beforeNavLinks = [
-      navComponent,
+      { path: navComponent, clientProps: { basePath: `/api${basePath}` } },
       ...(Array.isArray(existingBeforeNav) ? existingBeforeNav : [existingBeforeNav]),
     ]
     // beforeNavLinks configured
@@ -302,6 +308,15 @@ export const adminNavPlugin =
         ...(Array.isArray(existingAfterNav) ? existingAfterNav : [existingAfterNav]),
         ...safeConfig.afterNav,
       ]
+    }
+
+    // Publish the resolved endpoint prefix on the sanitized config so server
+    // components (the customizer view) can hand it to their client tree. The
+    // client cannot discover it on its own: it would need an endpoint to learn
+    // where the endpoints live.
+    config.custom = {
+      ...(config.custom || {}),
+      adminNav: { ...((config.custom as Record<string, any>)?.adminNav || {}), basePath: `/api${basePath}` },
     }
 
     // 5. Add the customizer admin view

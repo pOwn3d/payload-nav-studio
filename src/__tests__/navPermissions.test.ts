@@ -390,3 +390,45 @@ describe('GET /discover — découverte à chaud de la config finale', () => {
     expect(ids).not.toContain('secrets')
   })
 })
+
+// Regression: `endpointBasePath` used to be a dead option. The plugin registered
+// its routes under the configured prefix while AdminNav, NavCustomizer and
+// useNavPreferences all called `/api/admin-nav` literally — so setting the
+// option moved the endpoints and the sidebar simply stopped loading.
+describe('endpointBasePath — le client suit reellement le prefixe configure', () => {
+  const build = (pluginConfig: Parameters<typeof adminNavPlugin>[0]) =>
+    adminNavPlugin(pluginConfig)({ collections: [], globals: [] } as never)
+
+  it('publie le prefixe resolu sur la config, pour les composants serveur', () => {
+    const built = build({ endpointBasePath: '/custom-nav' }) as {
+      custom?: { adminNav?: { basePath?: string } }
+    }
+    expect(built.custom?.adminNav?.basePath).toBe('/api/custom-nav')
+  })
+
+  it('retombe sur le prefixe par defaut quand l option n est pas fournie', () => {
+    const built = build({}) as { custom?: { adminNav?: { basePath?: string } } }
+    expect(built.custom?.adminNav?.basePath).toBe('/api/admin-nav')
+  })
+
+  it('passe le prefixe a AdminNav en clientProps plutot que de le laisser deviner', () => {
+    const built = build({ endpointBasePath: '/custom-nav' }) as {
+      admin?: { components?: { beforeNavLinks?: unknown[] } }
+    }
+    const injected = built.admin?.components?.beforeNavLinks?.[0] as {
+      path?: string
+      clientProps?: { basePath?: string }
+    }
+    expect(injected.path).toContain('#AdminNav')
+    expect(injected.clientProps?.basePath).toBe('/api/custom-nav')
+  })
+
+  it('enregistre bien les endpoints sous le prefixe configure', () => {
+    const built = build({ endpointBasePath: '/custom-nav' }) as {
+      endpoints?: { path: string }[]
+    }
+    const paths = (built.endpoints ?? []).map((e) => e.path)
+    expect(paths).toContain('/custom-nav/default-nav')
+    expect(paths.every((p) => !p.startsWith('/admin-nav/'))).toBe(true)
+  })
+})

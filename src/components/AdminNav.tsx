@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useNavPreferences } from '../hooks/useNavPreferences.js'
+import { useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import { StyleInjector } from './StyleInjector.js'
 import { NavUserProfile } from './NavUserProfile.js'
@@ -153,9 +153,9 @@ interface DefaultNavMeta {
  * - User profile + availability popover above the footer
  * - Optional consumer-provided footer slot replacing the Customize link
  */
-const AdminNav: React.FC = () => {
+const AdminNav: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
   const { t, i18n } = usePluginTranslation()
-  const { layout, isLoaded, collapsedGroups, setCollapsedGroups } = useNavPreferences()
+  const { layout, isLoaded, collapsedGroups, setCollapsedGroups } = useNavPreferences(basePath)
 
   // Next.js reactive hooks — update instantly on client-side navigation
   const pathname = usePathname()
@@ -228,7 +228,7 @@ const AdminNav: React.FC = () => {
   // Fetch meta (hasBadges flag + navFooterSlot path) once at mount.
   useEffect(() => {
     let cancelled = false
-    fetch('/api/admin-nav/default-nav')
+    fetch(`${basePath}/default-nav`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return
@@ -256,7 +256,7 @@ const AdminNav: React.FC = () => {
     let cancelled = false
     const load = async () => {
       try {
-        const res = await fetch('/api/admin-nav/badges')
+        const res = await fetch(`${basePath}/badges`)
         if (!res.ok) return
         const data = (await res.json()) as BadgesResponse
         if (cancelled) return

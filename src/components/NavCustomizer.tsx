@@ -19,7 +19,7 @@ import {
   arrayMove,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable'
-import { useNavPreferences } from '../hooks/useNavPreferences.js'
+import { useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { SortableGroup } from './SortableGroup.js'
 import { SortableItem } from './SortableItem.js'
 import { GroupEditor } from './GroupEditor.js'
@@ -146,9 +146,9 @@ function navReducer(state: NavState, action: NavAction): NavState {
  * editing labels/icons/URLs, creating new groups/items.
  * Features: undo/redo, search/filter, import/export, bulk show/hide.
  */
-export const NavCustomizer: React.FC = () => {
+export const NavCustomizer: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
   const { t, i18n } = usePluginTranslation()
-  const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences()
+  const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences(basePath)
   const [navState, dispatch] = useReducer(navReducer, initialNavState)
   const { groups, undoStack, redoStack } = navState
   const [initialized, setInitialized] = useState(false)
@@ -271,7 +271,7 @@ export const NavCustomizer: React.FC = () => {
   const handleDiscover = useCallback(async () => {
     setIsDiscovering(true)
     try {
-      const res = await fetch('/api/admin-nav/discover')
+      const res = await fetch(`${basePath}/discover`)
       if (!res.ok) {
         showToast(t('plugin-admin-nav:discoverError'), true)
         return
