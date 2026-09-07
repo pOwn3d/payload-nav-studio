@@ -12,7 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        # Node 22 minimum: pnpm 11 (pinned via packageManager) requires the
+        # node:sqlite builtin, which does not exist before Node 22. This is a
+        # constraint of the toolchain, not of the published package — see engines.
+        node-version: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
