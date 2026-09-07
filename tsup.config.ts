@@ -22,7 +22,11 @@ const baseExternals = [
 rmSync('dist', { recursive: true, force: true })
 
 const sharedConfig: Partial<Options> = {
-  format: ['esm', 'cjs'],
+  // ESM only: the package is `type: module` and the whole Payload 3 ecosystem
+  // (payload, payload/shared, @payloadcms/ui, @payloadcms/next) is ESM-only with
+  // no `require` condition. The CJS barrels tsup used to emit could only ever
+  // throw ERR_REQUIRE_ESM, both on their own `./*.js` chunks and on payload.
+  format: ['esm'],
   dts: true,
   sourcemap: false,
   splitting: false,
@@ -32,28 +36,60 @@ const sharedConfig: Partial<Options> = {
   clean: false,
 }
 
-/**
- * Recursively prepend "use client" to all .js files in a directory.
- * Skips files that already have it and explicitly skips barrel files.
- */
-async function prependUseClient(...dirs: string[]) {
-  const { readdirSync, readFileSync, writeFileSync, statSync, existsSync } = await import('fs')
-  const { join } = await import('path')
+/** Client files produced by pass 2 (non-dnd components + hooks). */
+const NON_DND_CLIENT_FILES = [
+  'dist/components/AdminNav.js',
+  'dist/components/GroupEditor.js',
+  'dist/components/NavItemEditor.js',
+  'dist/components/IconPicker.js',
+  'dist/components/Icons.js',
+  'dist/components/StyleInjector.js',
+  'dist/components/NavUserProfile.js',
+  'dist/components/NavFooterSlot.js',
+  'dist/hooks/useNavPreferences.js',
+  'dist/hooks/usePluginTranslation.js',
+]
 
-  function walk(dir: string) {
-    if (!existsSync(dir)) return
-    for (const file of readdirSync(dir)) {
-      const path = join(dir, file)
-      if (statSync(path).isDirectory()) { walk(path); continue }
-      if (!file.endsWith('.js') && !file.endsWith('.cjs')) continue
-      if (file === 'client.js' || file === 'client.cjs') continue
-      const content = readFileSync(path, 'utf-8')
-      if (!content.startsWith('"use client"') && !content.startsWith("'use client'")) {
-        writeFileSync(path, '"use client";\n' + content)
-      }
+/** Client files produced by pass 3 (dnd-kit components, bundled). */
+const DND_CLIENT_FILES = [
+  'dist/components/NavCustomizer.js',
+  'dist/components/SortableGroup.js',
+  'dist/components/SortableItem.js',
+]
+
+/** Client file produced by pass 4 (the RSC view's client half). */
+const VIEW_CLIENT_FILES = ['dist/views/NavCustomizerViewClient.js']
+
+/**
+ * Prepend "use client" to an explicit list of built files.
+ *
+ * esbuild drops the directive from the sources, so it has to be re-added after
+ * the build. It must be done per-pass and never by walking a directory:
+ * `defineConfig([...])` runs its entries in PARALLEL, and a walker over the
+ * shared `dist/components` directory read (and rewrote) files another pass was
+ * still flushing — the idempotence guard below then froze the truncated result
+ * for good. Each pass now only touches the files it produced itself, and a
+ * missing file fails the build instead of shipping a component without its
+ * directive.
+ */
+async function prependUseClient(label: string, files: string[]) {
+  const { readFileSync, writeFileSync, existsSync } = await import('fs')
+
+  const missing: string[] = []
+  for (const file of files) {
+    if (!existsSync(file)) {
+      missing.push(file)
+      continue
     }
+    const content = readFileSync(file, 'utf-8')
+    if (content.startsWith('"use client"') || content.startsWith("'use client'")) continue
+    writeFileSync(file, '"use client";\n' + content)
   }
-  dirs.forEach(walk)
+
+  if (missing.length > 0) {
+    throw new Error(`[${label}] missing built files: ${missing.join(', ')}`)
+  }
+  console.log(`✓ [${label}] Prepended "use client" to ${files.length} file(s)`)
 }
 
 export default defineConfig([
@@ -90,8 +126,7 @@ export default defineConfig([
     ],
     bundle: false,
     onSuccess: async () => {
-      await prependUseClient('dist/components', 'dist/hooks')
-      console.log('✓ [non-dnd] Prepended "use client" to component/hook files')
+      await prependUseClient('non-dnd', NON_DND_CLIENT_FILES)
     },
   },
 
@@ -109,8 +144,7 @@ export default defineConfig([
     noExternal: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities', '@dnd-kit/accessibility'],
     bundle: true,
     onSuccess: async () => {
-      await prependUseClient('dist/components')
-      console.log('✓ [dnd] Prepended "use client" to dnd component files')
+      await prependUseClient('dnd', DND_CLIENT_FILES)
     },
   },
 
@@ -126,13 +160,7 @@ export default defineConfig([
     onSuccess: async () => {
       // ONLY NavCustomizerViewClient must have "use client"
       // NavCustomizerView is an RSC (server component) — must NOT have "use client"
-      const { readFileSync, writeFileSync } = await import('fs')
-      const clientFile = 'dist/views/NavCustomizerViewClient.js'
-      const content = readFileSync(clientFile, 'utf-8')
-      if (!content.startsWith('"use client"')) {
-        writeFileSync(clientFile, '"use client";\n' + content)
-      }
-      console.log('✓ [views] Prepended "use client" to NavCustomizerViewClient only')
+      await prependUseClient('views', VIEW_CLIENT_FILES)
     },
   },
 ])

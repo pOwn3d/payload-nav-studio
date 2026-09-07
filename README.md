@@ -1,107 +1,21 @@
-<!-- Header Banner -->
-<div align="center">
+# @consilioweb/payload-admin-nav
 
-  <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fadmin-nav;Payload+CMS+Sidebar+Plugin;Drag+%26+Drop+%7C+Per-User+Prefs;70%2B+Icons+%7C+i18n+Ready;Zero-Config+%7C+Instant+Render" alt="Typing SVG" />
-  </a>
+> A customizable admin sidebar for Payload CMS 3, with drag & drop reordering and per-user layouts stored in the database.
 
-  <br><br>
-
-  <!-- Badges -->
-  <a href="https://www.npmjs.com/package/@consilioweb/payload-admin-nav"><img src="https://img.shields.io/npm/v/@consilioweb/payload-admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@consilioweb/payload-admin-nav"><img src="https://img.shields.io/npm/dw/@consilioweb/payload-admin-nav?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
-  <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
-  <img src="https://img.shields.io/badge/Drag%20%26%20Drop-dnd--kit-8B5CF6?style=for-the-badge" alt="dnd-kit">
-  <img src="https://img.shields.io/badge/Icons-70%2B%20SVG-10B981?style=for-the-badge" alt="70+ Icons">
-  <img src="https://img.shields.io/badge/i18n-FR%20%7C%20EN-F59E0B?style=for-the-badge&logo=translate&logoColor=white" alt="i18n FR | EN">
-  <a href="https://github.com/pOwn3d/payload-nav-studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-7C3AED?style=for-the-badge" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-  <a href="https://github.com/pOwn3d/payload-nav-studio/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/pOwn3d/payload-nav-studio/ci.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white" alt="CI"></a>
-  <a href="https://github.com/pOwn3d/payload-nav-studio"><img src="https://img.shields.io/github/stars/pOwn3d/payload-nav-studio?style=for-the-badge&logo=github&color=181717" alt="GitHub stars"></a>
-
-</div>
-
-<p align="center">
-  <a href="https://buymeacoffee.com/pown3d">
-    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" />
-  </a>
-</p>
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-> [!IMPORTANT]
-> ## ⚠️ Next.js 16 + Turbopack — Known Issue
->
-> If you're using **Next.js 16** with Turbopack (default bundler), you may encounter a `createContext is not a function` error during `next build`. This is a **known Payload CMS issue** ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)) — not specific to this plugin.
->
-> **Workaround** — Add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
-> ```ts
-> export const dynamic = 'force-dynamic'
-> ```
->
-> And ensure all `@consilioweb/*` packages are in `transpilePackages` in your `next.config.ts`:
-> ```ts
-> transpilePackages: ['@consilioweb/seo-analyzer', '@consilioweb/payload-admin-nav', /* ...other @consilioweb packages */],
-> ```
->
-> ✅ **Next.js 15** works without any workaround.
+[![npm](https://img.shields.io/npm/v/@consilioweb/payload-admin-nav.svg)](https://www.npmjs.com/package/@consilioweb/payload-admin-nav)
+[![license](https://img.shields.io/npm/l/@consilioweb/payload-admin-nav.svg)](LICENSE)
+[![Payload](https://img.shields.io/badge/Payload%20CMS-3.x-0F172A.svg)](https://payloadcms.com)
 
 ## About
 
-> **@consilioweb/payload-admin-nav** — A fully customizable admin sidebar navigation plugin for Payload CMS 3. Drag & drop reordering, per-user preferences stored in the database, 70+ built-in SVG icons, nested sub-items, i18n support (FR/EN with multi-language labels), and a dedicated admin view to customize everything visually.
+`@consilioweb/payload-admin-nav` replaces the default Payload admin sidebar with a navigation each
+user can rearrange for themselves. The layout is persisted per user in a dedicated collection, and a
+visual editor at `/admin/nav-customizer` lets them drag & drop groups and items, toggle visibility,
+rename entries, swap icons and build nested sub-menus without touching code.
 
-<table>
-  <tr>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/drag-and-drop.png" width="50"/><br>
-      <b>Drag & Drop</b><br>
-      <sub>Reorder groups & items</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/user-group-man-man.png" width="50"/><br>
-      <b>Per-User Prefs</b><br>
-      <sub>Stored in database</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/paint-palette.png" width="50"/><br>
-      <b>70+ Icons</b><br>
-      <sub>Lucide-compatible SVG</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/api-settings.png" width="50"/><br>
-      <b>REST API</b><br>
-      <sub>Preferences CRUD</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/language.png" width="50"/><br>
-      <b>i18n Ready</b><br>
-      <sub>FR & EN out of the box</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/translate-text.png" width="50"/><br>
-      <b>Multi-lang Labels</b><br>
-      <sub>Per-language nav labels</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/automation.png" width="50"/><br>
-      <b>Auto-Discovery</b><br>
-      <sub>Zero-config mode</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/speed.png" width="50"/><br>
-      <b>Instant Render</b><br>
-      <sub>Two-tier cache, no flash</sub>
-    </td>
-  </tr>
-</table>
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-## Overview
-
-`@consilioweb/payload-admin-nav` replaces the default Payload CMS admin sidebar with a fully customizable navigation system. Each admin user gets their own layout preferences, persisted in the database. The plugin provides a visual editor (`/admin/nav-customizer`) where users can drag & drop groups and items, toggle visibility, edit labels and icons, create custom entries, and organize nested sub-menus — all without touching code.
+Given no configuration, it discovers your collections, globals and custom views and builds the
+navigation on its own. Given a `defaultNav`, it uses yours. Either way the server filters out every
+entry the current user has no read access to, so the sidebar never enumerates what the user cannot open.
 
 ### Screenshots
 
@@ -113,36 +27,38 @@
 |:---:|:---:|
 | ![Item Editor](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/item-editor.png) | ![Group Editor](https://raw.githubusercontent.com/pOwn3d/payload-nav-studio/main/docs/screenshots/group-editor.png) |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
 ## Table of Contents
 
+- [About](#about)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Zero-Config Mode](#zero-config-mode)
 - [Configuration](#configuration)
+- [Types](#types)
+- [Live Badges](#live-badges)
 - [Internationalization (i18n)](#internationalization-i18n)
 - [Built-in Icons](#built-in-icons)
 - [API Endpoints](#api-endpoints)
-- [Components](#components)
+- [Collections](#collections)
+- [Components and Hooks](#components-and-hooks)
 - [Package Exports](#package-exports)
 - [Requirements](#requirements)
+- [Migration from `@consilioweb/admin-nav`](#migration-from-consiliowebadmin-nav)
 - [Uninstall](#uninstall)
+- [Support](#support)
 - [License](#license)
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
 ## Features
 
 ### Drag & Drop Navigation
 
-Powered by [@dnd-kit](https://dndkit.com/), the navigation supports:
+Powered by [@dnd-kit](https://dndkit.com/), bundled into the package:
 
 - **Group reordering** — drag entire sections up and down
 - **Item reordering** — move items within or across groups
-- **Touch & keyboard support** — accessible on all devices
-- **Visual drag overlay** — see what you're moving in real-time
+- **Touch & keyboard support**
+- **Visual drag overlay** — see what you are moving in real time
 
 ### Per-User Preferences
 
@@ -150,108 +66,85 @@ Powered by [@dnd-kit](https://dndkit.com/), the navigation supports:
 - Preferences are stored in a dedicated Payload collection
 - Changes persist across sessions and devices
 - One-click reset to defaults
+- Collapsed groups are remembered per user
+
+### Collapsible Rail
+
+- **72px icon-only rail** — the toggle in the sidebar header swaps the full nav for a rail of icons;
+  a chevron at the top of the rail brings the full nav back
+- **Persisted per browser**, not per user — the state lives in `localStorage` under
+  `admin-nav-rail-collapsed`, unlike the layout itself, which is stored in the database
+- **The host column follows** — `html:has(.admin-nav--rail)` overrides Payload's `--nav-width`, so
+  the admin layout reflows instead of leaving an empty gutter
+- **Indicators survive the collapse** — active state is kept, a `live` item keeps a green corner dot
+  and a pending badge an amber one, and the user avatar stays pinned to the bottom with its
+  availability popover
+- **SSR-safe** — the first render is always expanded and the stored value is applied after
+  hydration, so there is no mismatch
+
+### Jump To
+
+- A search field at the top of the sidebar filters items by label — a sub-item label counts as a
+  match for its parent, and a group left with nothing to show disappears
+- `Cmd+K` / `Ctrl+K` focuses it from anywhere in the admin, `Esc` clears and blurs it
 
 ### Visual Customization
 
 - **Show/hide** any group or item
 - **Edit labels** — rename anything in the sidebar
 - **Edit URLs** — change where items link to
-- **Custom icons** — pick from 70+ SVG icons or use color dots
-- **Create groups** — add new sections to organize your nav
-- **Create items** — add custom links to any group
-- **Nested sub-items** — create dropdown sub-menus with their own icons
+- **Custom icons** — pick from 61 built-in SVG icons, or use a hex color dot
+- **Create groups and items** — add sections and custom links
+- **Nested sub-items** — one level of sub-menus, with their own icons
 - **Collapse groups** — set groups to start collapsed by default
+- **Import / export** — save a layout as JSON and load it back (files over 1 MB and layouts that
+  fail validation are refused)
 
-### 70+ Built-in Icons
+### Permission-Aware
 
-Inline SVG icons (Lucide-compatible, 24x24 viewBox) — zero external dependencies:
-
-- **Navigation** — home, layout-dashboard, settings, menu, compass
-- **Content** — file-text, newspaper, image, tag, calendar
-- **Support** — ticket, message-square, users, shield-check, mail-search
-- **Management** — receipt, briefcase, wallet, credit-card, truck
-- **Config** — database, globe, palette, key, monitor
-- **SEO** — search, trending-up, bar-chart, link, award
-- **Misc** — heart, star, bell, zap, gift, rocket, and many more
-
-### Internationalization (i18n)
-
-- **UI translations** — all plugin strings are translated (French & English included)
-- **Multi-language labels** — nav item labels and group titles support `string | Record<string, string>`
-- **Toggle in editor** — switch between single-language and multi-language mode per item
-- **Auto-detection** — existing `Record<string, string>` labels open in multi-lang mode automatically
-- **Fallback chain** — resolves: exact language → fallback language → first available value
-- **Extensible** — follows Payload's `deepMergeSimple` pattern, so you can override any translation key
+- `GET /default-nav` and `GET /discover` compute the caller's permissions through
+  `getAccessResults()` and drop every entry — sub-items included — whose `href` points at an
+  `/admin/collections/<slug>` or `/admin/globals/<slug>` the user cannot read
+- A group left with no visible item disappears with its items
+- Items pointing at custom routes, or at a slug that is not a registered collection or global, are
+  left untouched
+- All six endpoints are restricted to admin-panel users: the caller must belong to
+  `config.admin.user` and pass that collection's `access.admin` when one is declared
 
 ### Auto-Discovery (Zero-Config)
 
 - **No config needed** — call `adminNavPlugin()` with no arguments
-- **Collections** — grouped by `admin.group`, hidden collections excluded
-- **Globals** — added to a "Configuration" group
-- **Custom views** — detected and added to a "Views" group
-- **Smart icons** — 40+ slug-to-icon mappings (fallback: `box`)
-- **Fully customizable** — use `autoDiscoverNav()` to generate a base, then modify
+- **Collections** grouped by their `admin.group`, **globals** in a `Configuration` group, **custom
+  views** in a `Views` group
+- **Smart icons** — 53 slug-to-icon mappings plus substring matching (fallback: `box`)
+- `admin.hidden: true` entities are skipped; `admin.custom.navHidden: true` ones are added hidden
+  (`visible: false`) so users can re-enable them in the customizer
+
+### i18n
+
+- **UI translations** — every plugin string is translated in French and English
+- **Multi-language labels** — item labels and group titles accept `string | Record<string, string>`
+- **Toggle in editor** — switch between single-language and multi-language mode per item
+- **Fallback chain** — exact language → fallback language → first available value
+- **Extensible** — merged with Payload's `deepMergeSimple`, so host translations win
 
 ### Instant Rendering
 
-- **Two-tier cache** — module-level (survives SPA navigation) + sessionStorage (survives page reload)
-- **Cache TTL** — 60-second TTL to skip redundant server fetches (v0.12.0)
-- **No loading flash** — nav renders instantly on page transitions
-- **Background sync** — always fetches fresh data from the server after rendering the cache
-- **SSR-safe** — module cache is `null` on the server, matching client initial state (no hydration mismatch)
+- **Two-tier cache** — module-level (survives SPA navigation) + `sessionStorage` (survives reload)
+- **Cache TTL** — 60 seconds, to skip redundant server fetches
+- **No loading flash** — the nav renders immediately on page transitions
+- **SSR-safe** — the module cache is `null` on the server, matching the client's initial state
 
-### CSS Architecture (v0.12.0)
+### CSS Architecture
 
-- **BEM naming** — all classes follow `.admin-nav__element--modifier` convention
-- **Custom properties** — theming via CSS variables (`--admin-nav-*`)
-- **StyleInjector** — runtime CSS injection component for Payload admin
-- **Zero flash** — styles loaded before first render
+- **BEM naming** — classes follow the `.admin-nav__element--modifier` convention
+- **Custom properties** — theming through `--admin-nav-*` variables
+- **StyleInjector** — the stylesheet is injected at runtime by `AdminNav`, no import required
 
-### Unsaved Changes Guard (v0.12.0)
+### Unsaved Changes Guard
 
-- **beforeunload** — warns when navigating away with unsaved nav changes
-- **Undo/redo** — full history with useReducer (atomic state updates)
-
-### Admin View
-
-The plugin adds a dedicated view at `/admin/nav-customizer` with:
-
-- Full drag & drop interface
-- Group editor modal (title, ID, collapse state)
-- Item editor modal (label, URL, icon, prefix match, sub-items)
-- Icon picker with search and color mode
-- Toast notifications for save/reset feedback
-- Responsive layout
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-## ⚠️ Migration from `@consilioweb/admin-nav`
-
-This package has been renamed from `@consilioweb/admin-nav` to `@consilioweb/payload-admin-nav`.
-
-**Automatic migration (recommended):**
-
-```bash
-npx @consilioweb/migrate
-```
-
-This will update your `package.json` and all imports automatically.
-
-**Manual migration:**
-
-```bash
-npm uninstall @consilioweb/admin-nav
-npm install @consilioweb/payload-admin-nav
-```
-
-Then update your imports:
-
-```diff
-- import { adminNavPlugin } from '@consilioweb/admin-nav'
-+ import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
-```
-
----
+- **`beforeunload`** — warns when leaving the customizer with unsaved changes
+- **Undo / redo** — full history, atomic state updates through `useReducer`
 
 ## Installation
 
@@ -266,21 +159,42 @@ npm install @consilioweb/payload-admin-nav
 yarn add @consilioweb/payload-admin-nav
 ```
 
-> **Note:** `@dnd-kit` is bundled into the client bundle — you do **not** need to install it separately.
+> `@dnd-kit` is bundled into the customizer build — you do **not** need to install it separately.
 
 ### Peer Dependencies
 
 | Package | Version | Required |
 |---------|---------|----------|
-| `payload` | `^3.0.0` | **Yes** |
-| `react` | `^18.0.0 \|\| ^19.0.0` | **Yes** |
-| `react-dom` | `^18.0.0 \|\| ^19.0.0` | **Yes** |
-| `@payloadcms/next` | `^3.0.0` | Optional (admin views) |
-| `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
+| `payload` | `^3.0.0` | Yes |
+| `@payloadcms/ui` | `^3.0.0` | Yes |
+| `@payloadcms/next` | `^3.0.0` | Yes |
+| `next` | `^15.4.11 \|\| ^16.0.0` | Yes |
+| `react` | `^19.0.0` | Yes |
+| `react-dom` | `^19.0.0` | Yes |
 | `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
-| `next` | `^14.0.0 \|\| ^15.0.0` | Optional (admin UI) |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+Any Payload 3 admin app already has all the required ones.
+
+### Next.js 16 + Turbopack
+
+On **Next.js 16** with Turbopack (the default bundler), `next build` may fail with
+`createContext is not a function`. This is a known Payload CMS issue
+([#15429](https://github.com/payloadcms/payload/issues/15429),
+[#14330](https://github.com/payloadcms/payload/discussions/14330)), not specific to this plugin.
+
+Add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
+
+```ts
+export const dynamic = 'force-dynamic'
+```
+
+And list the `@consilioweb/*` packages in `transpilePackages` in `next.config.ts`:
+
+```ts
+transpilePackages: ['@consilioweb/payload-admin-nav', /* ...other @consilioweb packages */],
+```
+
+Next.js 15 needs no workaround.
 
 ## Quick Start
 
@@ -309,7 +223,7 @@ export default buildConfig({
           title: 'Settings',
           items: [
             { id: 'users', href: '/admin/collections/users', label: 'Users', icon: 'users' },
-            { id: 'settings', href: '/admin/globals/settings', label: 'Settings', icon: 'settings' },
+            { id: 'site-settings', href: '/admin/globals/settings', label: 'Settings', icon: 'settings' },
           ],
         },
       ],
@@ -318,126 +232,114 @@ export default buildConfig({
 })
 ```
 
-That's it. The plugin will automatically:
+That is all. The plugin will:
 
-1. Add a `admin-nav-preferences` collection to store per-user layouts
-2. Register API endpoints under `/api/admin-nav/`
-3. Inject the `AdminNav` component into the sidebar via `beforeNavLinks`
+1. Add an `admin-nav-preferences` collection to store per-user layouts
+2. Register the API endpoints under `/api/admin-nav/`
+3. Inject the `AdminNav` component into the sidebar through `beforeNavLinks`
 4. Add the Nav Customizer view at `/admin/nav-customizer`
 
-> **Important:** After installing, run `pnpm generate:importmap` to register the new components.
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+> **Important:** after installing, run `pnpm generate:importmap` to register the new components.
 
 ## Zero-Config Mode
 
-If you don't provide a `defaultNav`, the plugin **auto-discovers** your Payload config and builds the navigation automatically:
+Without a `defaultNav`, the plugin auto-discovers your Payload config and builds the navigation:
 
 ```ts
 import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
 
 export default buildConfig({
   plugins: [
-    adminNavPlugin(), // No config needed — collections, globals & views are auto-detected
+    adminNavPlugin(), // collections, globals and custom views are auto-detected
   ],
 })
 ```
 
 Auto-discovery will:
 
-- Group collections by their `admin.group` value (or "Collections" as fallback)
-- Add globals to a "Configuration" group
-- Add custom admin views to a "Views" group
-- Guess icons from 40+ slug mappings (e.g. `pages` → `file-text`, `users` → `users`, `media` → `image`)
-- Skip hidden collections (`admin.hidden: true`)
+- Group collections by their `admin.group` value (fallback group: `Collections`)
+- Add globals to a `Configuration` group (or to their own `admin.group`)
+- Add custom admin views to a `Views` group
+- Guess icons from 53 slug mappings and substring matches (`pages` → `file-text`, `users` → `users`,
+  `media` → `image`, …), falling back to `box`
+- Skip collections and globals with `admin.hidden: true`, and add those with
+  `admin.custom.navHidden: true` as hidden items
 
-You can also use `autoDiscoverNav` programmatically to generate a base config, then customize it:
+`autoDiscoverNav()` is exported if you want to generate the base layout and change it. It takes the
+Payload config, so it has to run once the config exists — inside a plugin of your own:
 
 ```ts
+import type { Config, Plugin } from 'payload'
+import { buildConfig } from 'payload'
 import { adminNavPlugin, autoDiscoverNav } from '@consilioweb/payload-admin-nav'
 
-const baseNav = autoDiscoverNav(config)
-// Modify baseNav as needed...
+const navPlugin: Plugin = (config: Config) => {
+  const discovered = autoDiscoverNav(config)
+  const defaultNav = discovered.filter((group) => group.id !== 'views')
+  return adminNavPlugin({ defaultNav })(config)
+}
 
 export default buildConfig({
-  plugins: [
-    adminNavPlugin({ defaultNav: baseNav }),
-  ],
+  plugins: [navPlugin],
 })
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
 ## Configuration
-
-### `AdminNavPluginConfig`
 
 ```ts
 adminNavPlugin({
   defaultNav: [],                           // Optional — auto-discovered if omitted
-  afterNav: [],                             // Component paths to render after the nav
+  afterNav: [],                             // Component paths rendered after the nav
   collectionSlug: 'admin-nav-preferences',  // Preferences collection slug
   userCollectionSlug: 'users',              // User collection for the relationship
-  endpointBasePath: '/admin-nav',           // API endpoint prefix
-  addCustomizerView: true,                  // Add /admin/nav-customizer view
-  navComponentPath: undefined,              // Override AdminNav component path
+  endpointBasePath: '/admin-nav',           // API endpoint prefix — keep the default
+  addCustomizerView: true,                  // Add the /admin/nav-customizer view
+  navComponentPath: undefined,              // Override the AdminNav component path
+  navFooterSlot: undefined,                 // Component path replacing the Customize button
+  brand: undefined,                         // Sidebar header branding (host identity by default)
 })
 ```
 
+### `AdminNavPluginConfig`
+
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `defaultNav` | `NavGroupConfig[]` | Auto-découvert | Structure initiale de la sidebar. Si omis, le plugin auto-découvre les collections, globals et vues depuis la config Payload |
-| `afterNav` | `string[]` | `[]` | Chemins de composants à afficher après la navigation |
-| `collectionSlug` | `string` | `'admin-nav-preferences'` | Slug de la collection pour le stockage des préférences |
-| `userCollectionSlug` | `string` | `'users'` | Slug de la collection utilisateurs pour la relation |
-| `endpointBasePath` | `string` | `'/admin-nav'` | Chemin de base pour les endpoints API |
-| `addCustomizerView` | `boolean` | `true` | Ajouter la vue admin Nav Customizer à `/admin/nav-customizer` |
-| `navComponentPath` | `string` | `'@consilioweb/payload-admin-nav/client#AdminNav'` | Surcharger le chemin du composant AdminNav (pour les installations `file:` ou `link:`) |
+| `defaultNav` | `NavGroupConfig[]` | auto-discovered | Initial sidebar structure. When omitted, collections, globals and views are discovered from the Payload config |
+| `afterNav` | `string[]` | `[]` | Component paths appended to `admin.components.afterNavLinks` |
+| `collectionSlug` | `string` | `'admin-nav-preferences'` | Slug of the preferences collection |
+| `userCollectionSlug` | `string` | `'users'` | User collection targeted by the `user` relationship |
+| `endpointBasePath` | `string` | `'/admin-nav'` | Base path of the API endpoints. Keep the default — see the warning below |
+| `addCustomizerView` | `boolean` | `true` | Register the Nav Customizer view at `/admin/nav-customizer` |
+| `navComponentPath` | `string` | `'@consilioweb/payload-admin-nav/client#AdminNav'` | Override the `beforeNavLinks` component path — useful for `file:` / `link:` installs, where webpack RSC resolution needs a local wrapper re-exporting `AdminNav` |
+| `navFooterSlot` | `string` | none | Payload component path rendered at the bottom of the nav, replacing the default *Customize* button |
+| `brand` | `AdminNavBrandConfig` | host identity | Sidebar header (logo + wordmark) |
 
-### Types
+> **`endpointBasePath` only moves the server routes.** The bundled `AdminNav` fetches
+> `/api/admin-nav/default-nav` and `/api/admin-nav/badges` at those literal paths, and both it and
+> the customizer call `useNavPreferences()` with no argument, which defaults to `'/api/admin-nav'`.
+> Setting the option to anything else registers the endpoints elsewhere and the sidebar stops
+> loading. Change it only alongside your own nav component (`navComponentPath`) that fetches the
+> matching paths and passes the base to [`useNavPreferences(basePath)`](#usenavpreferences).
 
-#### `LocalizedString`
+### `AdminNavBrandConfig`
 
-```ts
-type LocalizedString = string | Record<string, string>
-```
-
-Labels and titles accept either a plain string or a per-language record. Both are fully backward-compatible.
-
-#### `NavGroupConfig`
-
-```ts
-interface NavGroupConfig {
-  id: string                   // Unique group ID
-  title: LocalizedString       // Section header label (string or per-language)
-  items: NavItemConfig[]       // Items in this group
-  visible?: boolean            // Whether the group is visible (default: true)
-  defaultCollapsed?: boolean   // Start collapsed (default: false)
-}
-```
-
-#### `NavItemConfig`
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `wordmark` | `string \| false` | `admin.meta.title`, else `admin.meta.titleSuffix` (Payload's own `- Payload` default is discarded), else none | Text displayed next to the logo. `false` removes it |
+| `logoPath` | `string \| false` | none — the built-in neutral glyph | Path to a logo component, imported by the **browser** at runtime, like `navFooterSlot`. It must be a path the browser can resolve (a URL, or an entry of the app's import map), not a Payload component path — those are resolved server-side by the importMap and never reach the client. On import failure the built-in glyph is shown |
 
 ```ts
-interface NavItemConfig {
-  id: string                   // Unique item ID
-  href: string                 // Admin URL path
-  label: LocalizedString       // Display label (string or per-language)
-  icon: string                 // Icon name or '#RRGGBB' for color dot
-  matchPrefix?: boolean        // Activate on pathname.startsWith(href)
-  children?: NavItemConfig[]   // Nested sub-items
-  visible?: boolean            // Whether visible (default: true)
-}
+adminNavPlugin({
+  brand: { wordmark: 'Acme', logoPath: '/admin-assets/logo.js#default' },
+})
+
+// No header branding at all
+adminNavPlugin({ brand: { wordmark: false, logoPath: false } })
 ```
 
-#### `NavLayout`
-
-```ts
-interface NavLayout {
-  groups: NavGroupConfig[]  // Ordered list of groups
-  version: number           // Schema version for future migrations
-}
-```
+> The plugin never displays its author's name: with no `brand` and no identity declared by the host,
+> no brand block is rendered at all. The toggle that collapses the nav to the
+> [72px rail](#collapsible-rail) is rendered either way.
 
 ### Advanced Example
 
@@ -458,9 +360,9 @@ adminNavPlugin({
       title: 'SEO',  // Plain string still works
       defaultCollapsed: true,
       items: [
-        { id: 'seo-dashboard', href: '/admin/seo', label: 'Dashboard', icon: 'trending-up', matchPrefix: true },
-        { id: 'sitemap', href: '/admin/sitemap-audit', label: 'Sitemap', icon: 'globe' },
-        { id: 'redirects', href: '/admin/redirects', label: 'Redirects', icon: 'corner-down-right' },
+        { id: 'seo-dashboard', href: '/admin/seo', label: 'Dashboard', icon: 'bar-chart-3', matchPrefix: true },
+        { id: 'sitemap', href: '/admin/sitemap-audit', label: 'Sitemap', icon: 'sitemap' },
+        { id: 'redirects', href: '/admin/redirects', label: 'Redirects', icon: 'shuffle' },
       ],
     },
     {
@@ -494,13 +396,120 @@ adminNavPlugin({
 })
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+## Types
+
+### `LocalizedString`
+
+```ts
+type LocalizedString = string | Record<string, string>
+```
+
+Labels and titles accept either a plain string or a per-language record. Both are fully
+backward-compatible.
+
+### `NavGroupConfig`
+
+```ts
+interface NavGroupConfig {
+  id: string                   // Unique group ID
+  title: LocalizedString       // Section header label
+  items: NavItemConfig[]       // Items in this group
+  visible?: boolean            // Whether the group is visible (default: true)
+  defaultCollapsed?: boolean   // Start collapsed (default: false)
+  groupBadge?: NavBadgeFn      // Async counter shown next to the group title
+}
+```
+
+### `NavItemConfig`
+
+```ts
+interface NavItemConfig {
+  id: string                   // Unique item ID
+  href: string                 // Admin URL path
+  label: LocalizedString       // Display label
+  icon: string                 // Icon name, or '#RRGGBB' for a color dot
+  matchPrefix?: boolean        // Activate on pathname.startsWith(href)
+  children?: NavChildConfig[]  // Nested sub-items (one level)
+  visible?: boolean            // Whether visible (default: true)
+  live?: boolean               // Pulsing green dot next to the label
+}
+```
+
+### `NavChildConfig`
+
+```ts
+interface NavChildConfig extends Omit<NavItemConfig, 'children'> {
+  childBadge?: NavBadgeFn      // Async counter shown next to the sub-item label
+  alert?: boolean              // Render the badge pill in error color
+}
+```
+
+### `NavLayout`
+
+```ts
+interface NavLayout {
+  groups: NavGroupConfig[]  // Ordered list of groups
+  version: number           // Structural fingerprint used for preference migration
+}
+```
+
+## Live Badges
+
+A group or a sub-item can carry an async resolver that produces a counter. Resolvers run
+server-side, in parallel, through `GET /admin-nav/badges`. `GET /admin-nav/default-nav` reports
+whether any resolver is declared through its `hasBadges` flag, and the client starts polling
+`/badges` every 60 seconds only when that flag is true.
+
+```ts
+import type { NavBadgeFn } from '@consilioweb/payload-admin-nav'
+
+const openTickets: NavBadgeFn = async (req) => {
+  const { totalDocs } = await req.payload.count({
+    collection: 'tickets',
+    where: { status: { equals: 'open' } },
+  })
+  return totalDocs
+}
+
+adminNavPlugin({
+  defaultNav: [
+    {
+      id: 'support',
+      title: 'Support',
+      groupBadge: openTickets,
+      items: [
+        {
+          id: 'tickets',
+          href: '/admin/collections/tickets',
+          label: 'Tickets',
+          icon: 'ticket',
+          children: [
+            {
+              id: 'tickets-open',
+              href: '/admin/collections/tickets?status=open',
+              label: 'Open',
+              icon: '#EF4444',
+              childBadge: openTickets,
+              alert: true,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+})
+```
+
+A resolver returning `null`/`undefined`, or throwing, produces no badge instead of breaking the nav.
+Negative or non-integer values are clamped. Keep each resolver to one fast query — the response time
+of the endpoint is that of its slowest resolver.
 
 ## Internationalization (i18n)
 
 ### Plugin UI Translations
 
-The plugin ships with French and English translations for all UI strings (buttons, labels, toasts, confirmations, etc.). Translations are automatically merged into Payload's i18n system using `deepMergeSimple`.
+The plugin ships French and English translations for its UI strings. They are merged into Payload's
+i18n system with `deepMergeSimple`, host translations taking precedence.
 
 All keys are namespaced under `plugin-admin-nav`:
 
@@ -509,7 +518,7 @@ t('plugin-admin-nav:save')      // "Sauvegarder" (FR) / "Save" (EN)
 t('plugin-admin-nav:editItem')  // "Modifier l'item" (FR) / "Edit item" (EN)
 ```
 
-To override or add a language, merge your translations in `payload.config.ts`:
+To override a key or add a language, merge your own translations in `payload.config.ts`:
 
 ```ts
 import { buildConfig } from 'payload'
@@ -549,7 +558,7 @@ adminNavPlugin({
         {
           id: 'posts',
           href: '/admin/collections/posts',
-          label: 'Blog',                           // Simple string still works
+          label: 'Blog',                          // Simple string still works
           icon: 'newspaper',
         },
       ],
@@ -558,28 +567,30 @@ adminNavPlugin({
 })
 ```
 
-The item and group editors include a **Multi-lang** toggle that lets users switch between single-language and multi-language mode. When a label is already a `Record<string, string>`, the editor opens in multi-lang mode automatically.
+The item and group editors include a **Multi-lang** toggle. When a label is already a
+`Record<string, string>`, the editor opens in multi-lang mode automatically.
 
 ### Utilities
 
 ```ts
 import { resolveLabel, isMultiLang } from '@consilioweb/payload-admin-nav'
 
-// Resolve a label to the current language
-resolveLabel({ fr: 'Pages', en: 'Pages' }, 'fr')        // 'Pages'
-resolveLabel({ fr: 'Contenu', en: 'Content' }, 'en')    // 'Content'
+// Resolve a label to the current language — lang → fallback → first value → ''
+resolveLabel({ fr: 'Pages', en: 'Pages' }, 'fr')          // 'Pages'
+resolveLabel({ fr: 'Contenu', en: 'Content' }, 'en')      // 'Content'
+resolveLabel({ de: 'Inhalt' }, 'en', 'de')                // 'Inhalt'
 resolveLabel('Simple string', 'fr')                       // 'Simple string'
 
 // Type guard
 isMultiLang({ fr: 'Oui', en: 'Yes' })  // true
-isMultiLang('plain')                     // false
+isMultiLang('plain')                   // false
 ```
 
 ### `usePluginTranslation` Hook
 
-Type-safe wrapper around Payload's `useTranslation` that accepts plugin custom keys:
+Typed wrapper around Payload's `useTranslation` that knows the plugin's keys:
 
-```ts
+```tsx
 import { usePluginTranslation } from '@consilioweb/payload-admin-nav/client'
 
 function MyComponent() {
@@ -588,36 +599,37 @@ function MyComponent() {
 }
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
 ## Built-in Icons
 
-The plugin includes 70+ inline SVG icons with zero external dependencies. All icons use a 24x24 viewBox and are Lucide-compatible.
-
-Use any icon name in `NavItemConfig.icon`:
+The plugin ships 61 inline SVG icons with no external dependency. All use a 24x24 viewBox and are
+Lucide-compatible. Use any name in `NavItemConfig.icon`:
 
 ```ts
 { id: 'pages', href: '/admin/collections/pages', label: 'Pages', icon: 'file-text' }
 ```
 
-For color dots instead of icons, use a hex color:
+For a color dot instead of an icon, use a hex color:
 
 ```ts
-{ id: 'urgent', href: '...', label: 'Urgent', icon: '#EF4444' }
+{ id: 'urgent', href: '/admin/collections/tickets?priority=high', label: 'Urgent', icon: '#EF4444' }
 ```
 
 <details>
-<summary><strong>Full icon list (70+)</strong></summary>
+<summary><strong>Full icon list (61)</strong></summary>
+
+> This table is the exact content of the registry (`src/icons.ts`). Any other name — including
+> Lucide icons not listed here — renders the `box` fallback and logs a warning outside production.
 
 | Category | Icons |
 |----------|-------|
-| **Navigation** | `home`, `layout-dashboard`, `settings`, `menu`, `compass`, `map`, `navigation` |
-| **Content** | `file-text`, `newspaper`, `image`, `tag`, `calendar`, `bookmark`, `clipboard` |
-| **Support** | `ticket`, `message-square`, `users`, `shield-check`, `mail-search`, `folder-kanban`, `file-up` |
-| **Management** | `receipt`, `briefcase`, `wallet`, `credit-card`, `truck`, `package`, `shopping-cart` |
-| **Config** | `database`, `globe`, `palette`, `key`, `monitor`, `server`, `cloud` |
-| **SEO** | `search`, `trending-up`, `bar-chart`, `link`, `award`, `target`, `activity` |
-| **Misc** | `heart`, `star`, `bell`, `zap`, `gift`, `rocket`, `flag`, `coffee`, `music`, `camera` |
+| **Navigation & Layout** (3) | `home`, `layout-dashboard`, `settings` |
+| **Content** (5) | `file-text`, `newspaper`, `image`, `tag`, `calendar` |
+| **Support** (7) | `ticket`, `message-square`, `users`, `folder-kanban`, `file-up`, `mail-search`, `shield-check` |
+| **Management** (4) | `receipt`, `clock`, `mail`, `clipboard-list` |
+| **Configuration** (3) | `panel-top`, `panel-bottom`, `user-cog` |
+| **SEO** (9) | `search-check`, `bar-chart-3`, `shuffle`, `layers`, `activity`, `search`, `file-code-2`, `git-branch`, `spell-check` |
+| **Misc** (22) | `plus`, `minus`, `x`, `check`, `chevron-down`, `chevron-right`, `grip-vertical`, `eye`, `eye-off`, `pencil`, `trash-2`, `save`, `rotate-ccw`, `move`, `palette`, `box`, `star`, `heart`, `zap`, `globe`, `link`, `external-link` |
+| **Maintenance & Tools** (8) | `wrench`, `bell`, `history`, `gauge`, `target`, `sitemap`, `webhook`, `code` |
 
 </details>
 
@@ -626,45 +638,88 @@ For color dots instead of icons, use a hex color:
 ```ts
 import { getIconNames, getIconPath, iconPaths } from '@consilioweb/payload-admin-nav'
 
-// Get all available icon names
-const names = getIconNames() // ['home', 'file-text', ...]
-
-// Get the SVG path data for an icon
-const path = getIconPath('home') // 'M3 9l9-7 9 7v11a2...'
-
-// Access the full registry
-console.log(Object.keys(iconPaths).length) // 70+
+const names = getIconNames()        // ['home', 'layout-dashboard', ...]
+const path = getIconPath('home')    // SVG path data
+Object.keys(iconPaths).length       // 61
 ```
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
 ## API Endpoints
 
-All endpoints are prefixed with the configured `endpointBasePath` (default: `/admin-nav`). All endpoints require an authenticated admin user.
+All endpoints are prefixed with the configured `endpointBasePath` (default: `/admin-nav`, the only
+value the bundled client works with — see [`AdminNavPluginConfig`](#adminnavpluginconfig)) and are
+served under `/api`. Every one of them runs the same guard first: an unauthenticated request gets
+`401`, and a request authenticated against a collection other than `config.admin.user` — or failing
+that collection's `access.admin` — gets `403`. Each is rate-limited per user.
 
-| Method | Path | Description |
+| Method | Path | Access | Rate limit | Description |
+|--------|------|--------|-----------|-------------|
+| `GET` | `/admin-nav/preferences` | admin user | 60 / min | Return the current user's stored `navLayout`, `version` and `collapsedGroups` (`navLayout: null` when the user never customized anything) |
+| `PATCH` | `/admin-nav/preferences` | admin user | 30 / min | Save the current user's layout |
+| `DELETE` | `/admin-nav/preferences` | admin user | 30 / min | Delete the stored layout and fall back to the default |
+| `GET` | `/admin-nav/default-nav` | admin user | 60 / min | Default nav (permission-filtered), nav version, `afterNav`, `basePath`, `hasBadges` (whether any badge resolver is declared), `navFooterSlot`, resolved `brand` |
+| `GET` | `/admin-nav/discover` | admin user | 30 / min | Auto-discovery run against the final runtime config (permission-filtered) |
+| `GET` | `/admin-nav/badges` | admin user | 120 / min | Resolve every `groupBadge` / `childBadge` and return `{ groups, children }` |
+
+### `PATCH /admin-nav/preferences` validation
+
+A body is refused with `413` when its announced `Content-Length` exceeds 256 KB, and with `400` when:
+
+- `navLayout` has no `groups` array
+- more than 50 groups, or more than 100 items in a group, or more than 50 children on an entry
+- an item **or child** is missing `href`, `label` or `icon`, or has an unusable type (`href` and
+  `icon` must be strings; `label` accepts a string or a per-language object)
+- nesting goes deeper than items → children
+- an `id` exceeds 100 characters, a `label` 200, an `icon` 50
+- an `href` is not a safe relative path — `javascript:`, `data:`, `vbscript:`, `//evil.com`,
+  `/\evil.com` and their tab/newline-obfuscated variants are rejected
+
+The same `href` rule is exported as `isSafeHref()` and is applied by the customizer's JSON import and
+by `NavItemEditor`.
+
+## Collections
+
+| Slug | Role | Access |
+|------|------|--------|
+| `admin-nav-preferences` (configurable) | One row per user: `user`, `navLayout` (JSON), `collapsedGroups` (JSON), `version` | `read` / `update` / `delete` restricted to the row whose `user` is the requester; `create` requires an authenticated user. Hidden from the admin UI (`admin.hidden: true`) |
+
+## Components and Hooks
+
+### Client (`/client`)
+
+| Export | Description |
+|--------|-------------|
+| `AdminNav` | The sidebar itself, injected through `beforeNavLinks` |
+| `GroupEditor` | Modal for editing group properties (with multi-lang toggle) |
+| `NavItemEditor` | Modal for editing an item, its sub-items and its multi-lang labels |
+| `IconPicker` | Icon dropdown with search and color mode |
+| `NavUserProfile` | User block rendered at the bottom of the nav |
+| `NavFooterSlot` | Loader for the component declared in `navFooterSlot` |
+| `useNavPreferences` | Hook reading and saving the nav preferences |
+| `usePluginTranslation` | Typed i18n hook carrying the plugin translation keys |
+
+`NavCustomizer`, `SortableGroup` and `SortableItem` are deliberately **not** re-exported from
+`/client`: they pull in `@dnd-kit`, whose `createContext` crashes when Turbopack evaluates the barrel
+in an SSR context. They are reached only through the `views` entry.
+
+### Server views (`/views`)
+
+| Export | Path | Description |
 |--------|------|-------------|
-| `GET` | `/admin-nav/preferences` | Get the current user's navigation preferences |
-| `PATCH` | `/admin-nav/preferences` | Save the current user's navigation layout |
-| `DELETE` | `/admin-nav/preferences` | Reset to default navigation |
-| `GET` | `/admin-nav/default-nav` | Get the plugin's default nav config (permission-filtered) |
-| `POST` | `/admin-nav/import` | Import navigation from JSON file (max 1MB) |
+| `NavCustomizerView` | `/admin/nav-customizer` | Admin view wrapping the customizer in Payload's `DefaultTemplate` |
 
-### `useNavPreferences` Hook
+### `useNavPreferences`
 
-For custom components that need to interact with nav preferences:
-
-```ts
+```tsx
 import { useNavPreferences } from '@consilioweb/payload-admin-nav/client'
 
 function MyComponent() {
-  const { layout, isLoaded, isSaving, isCustom, save, reset, reload } = useNavPreferences()
+  const { layout, isLoaded, isCustom, reset } = useNavPreferences()
 
-  if (!isLoaded) return <p>Loading...</p>
+  if (!isLoaded) return <p>Loading…</p>
 
   return (
     <div>
-      <p>Groups: {layout.groups.length}</p>
+      <p>Groups: {layout.length}</p>
       <p>Custom layout: {isCustom ? 'Yes' : 'No'}</p>
       <button onClick={reset}>Reset to defaults</button>
     </div>
@@ -674,54 +729,50 @@ function MyComponent() {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `layout` | `NavLayout` | Current navigation layout (user's or default) |
+| `layout` | `NavGroupConfig[]` | Current navigation layout (the user's, or the default one) |
 | `isLoaded` | `boolean` | Whether preferences have been fetched |
-| `isSaving` | `boolean` | Whether a save operation is in progress |
-| `isCustom` | `boolean` | Whether the user has customized their nav |
-| `save` | `(layout: NavLayout) => Promise<void>` | Save a new layout |
-| `reset` | `() => Promise<void>` | Reset to default navigation |
-| `reload` | `() => Promise<void>` | Reload preferences from server |
+| `isSaving` | `boolean` | Whether a save or reset is in progress |
+| `isCustom` | `boolean` | Whether the layout differs from the default |
+| `save` | `(groups: NavGroupConfig[]) => Promise<boolean>` | Persist a layout. Returns `false` when nothing was written — including when the nav version could not be resolved |
+| `reset` | `() => Promise<boolean>` | Delete the stored layout and go back to the default |
+| `reload` | `() => Promise<void>` | Re-fetch preferences from the server |
+| `collapsedGroups` | `string[]` | IDs of the groups collapsed by this user |
+| `setCollapsedGroups` | `(groups: string[]) => void` | Update them (debounced save to the server) |
+
+`save()` and `reset()` return a boolean: check it before showing a success state.
+
+The hook takes one optional argument — `useNavPreferences(basePath = '/api/admin-nav')` — the
+`/api`-prefixed base of the plugin endpoints. Pass it only if you changed `endpointBasePath`, which
+also requires replacing the bundled nav component (see
+[`AdminNavPluginConfig`](#adminnavpluginconfig)).
 
 ### Caching Strategy
 
-The hook uses a **two-tier cache** for instant rendering with zero flash:
+The hook uses a two-tier cache for instant rendering with no flash:
 
-1. **Module-level cache** — JavaScript variables at the module scope survive React component re-mounts during SPA navigation. The layout is available immediately in `useState()`, so subsequent page navigations render the nav instantly with no loading state.
+1. **Module-level cache** — module-scope variables survive component re-mounts during SPA
+   navigation, so the layout is available immediately in `useState()`.
+2. **`sessionStorage` cache** — survives a full page reload. It is read in `useEffect`
+   (post-hydration) to avoid a hydration mismatch.
 
-2. **sessionStorage cache** — Persists across full page reloads. Read in `useEffect` (post-hydration) to avoid React hydration mismatch errors.
-
-On the server, module variables are always `null`, matching the empty initial state on the client — no hydration mismatch. After the first successful fetch, both caches are populated and all subsequent renders are instant.
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-## Components
-
-### Client Components
-
-| Component / Hook | Description |
-|------------------|-------------|
-| `AdminNav` | Main sidebar navigation component (injected via `beforeNavLinks`) |
-| `NavCustomizer` | Full drag & drop editor for the navigation layout |
-| `SortableGroup` | Draggable group component (used by NavCustomizer) |
-| `SortableItem` | Draggable item component (used by NavCustomizer) |
-| `GroupEditor` | Modal for editing group properties (with multi-lang toggle) |
-| `NavItemEditor` | Modal for editing item properties, sub-items, and multi-lang labels |
-| `IconPicker` | Icon selection dropdown with search and color mode |
-| `useNavPreferences` | Hook for reading/saving nav preferences |
-| `usePluginTranslation` | Type-safe i18n hook with plugin translation keys |
-
-### Server Views
-
-| Component | Path | Description |
-|-----------|------|-------------|
-| `NavCustomizerView` | `/admin/nav-customizer` | Admin view wrapping the NavCustomizer in Payload's DefaultTemplate |
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+On the server the module variables are always `null`, matching the client's initial state. After the
+first successful fetch both caches are populated, and a fetch is skipped entirely while the cache is
+younger than 60 seconds.
 
 ## Package Exports
 
+The package is ESM-only (`type: module`). There is no CommonJS build: `require()` will fail at
+resolution — use `import`.
+
+| Subpath | Exposes | Environment |
+|---------|---------|-------------|
+| `.` | Plugin, auto-discovery, collection factory, endpoint handlers, icons, utilities, types | Server |
+| `./client` | React components and hooks for the admin UI | Client |
+| `./views` | Admin views wrapped in Payload's `DefaultTemplate` | Server (RSC) |
+| `./styles`, `./styles.css` | The raw stylesheet (`src/styles/admin-nav.css`), for apps that prefer importing it rather than relying on the runtime injector | Any bundler |
+
 ```ts
-// Main entry — plugin, collection, endpoints, icons, types, i18n utilities
+// Main entry
 import {
   adminNavPlugin,
   autoDiscoverNav,
@@ -729,50 +780,86 @@ import {
   createGetPreferencesHandler,
   createSavePreferencesHandler,
   createResetPreferencesHandler,
+  createBadgesHandler,
   getIconNames,
   getIconPath,
   iconPaths,
   resolveLabel,
   isMultiLang,
+  isSafeHref,
+  computeNavFingerprint,
+  dedupeNavItems,
 } from '@consilioweb/payload-admin-nav'
 import type {
+  LocalizedString,
   NavItemConfig,
+  NavChildConfig,
   NavGroupConfig,
   NavLayout,
+  NavBadgeFn,
+  NavBadgesPayload,
   AdminNavPluginConfig,
-  LocalizedString,
+  AdminNavBrandConfig,
 } from '@consilioweb/payload-admin-nav'
 
-// Client components — React components for Payload admin UI
+// Client components
 import {
   AdminNav,
-  NavCustomizer,
-  SortableGroup,
-  SortableItem,
   GroupEditor,
   NavItemEditor,
   IconPicker,
+  NavUserProfile,
+  NavFooterSlot,
   useNavPreferences,
   usePluginTranslation,
   resolveLabel,
   isMultiLang,
+  isSafeHref,
 } from '@consilioweb/payload-admin-nav/client'
 import type { PluginAdminNavTranslationKeys } from '@consilioweb/payload-admin-nav/client'
 
-// Server views — admin views wrapped in DefaultTemplate
+// Server views
 import { NavCustomizerView } from '@consilioweb/payload-admin-nav/views'
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
 ## Requirements
 
-- **Node.js** >= 18
-- **Payload CMS** 3.x
-- **React** 18.x or 19.x (for admin UI components)
-- **Database**: Any Payload-supported adapter (SQLite, PostgreSQL, MongoDB)
+| | Version |
+|---|---|
+| **Node.js** | `^18.20.2 \|\| >=20.9.0` |
+| **Payload CMS** | `^3.0.0` |
+| **Next.js** | `^15.4.11 \|\| ^16.0.0` |
+| **React / React DOM** | `^19.0.0` |
+| **Database** | Any Payload-supported adapter (SQLite, PostgreSQL, MongoDB) |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+React 18, Next 14 and Next 15.0–15.4.10 are no longer supported: installing on them raises an
+`ERESOLVE` / peer warning.
+
+## Migration from `@consilioweb/admin-nav`
+
+This package was renamed from `@consilioweb/admin-nav` to `@consilioweb/payload-admin-nav`.
+
+**Automatic migration (recommended):**
+
+```bash
+npx @consilioweb/migrate
+```
+
+This updates your `package.json` and all imports automatically.
+
+**Manual migration:**
+
+```bash
+npm uninstall @consilioweb/admin-nav
+npm install @consilioweb/payload-admin-nav
+```
+
+Then update your imports:
+
+```diff
+- import { adminNavPlugin } from '@consilioweb/admin-nav'
++ import { adminNavPlugin } from '@consilioweb/payload-admin-nav'
+```
 
 ## Uninstall
 
@@ -791,7 +878,7 @@ pnpm generate:importmap
 
 ### Data cleanup (optional)
 
-The `admin-nav-preferences` collection data remains in your database after uninstall. To remove it:
+The `admin-nav-preferences` data stays in your database after uninstall. To remove it:
 
 **SQLite:**
 ```sql
@@ -808,50 +895,12 @@ DROP TABLE IF EXISTS "admin-nav-preferences" CASCADE;
 db.getCollection('admin-nav-preferences').drop()
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+## Support
 
-## Roadmap
-
-- Role-based navigation filtering (show/hide items per user role)
-- Keyboard shortcuts for navigation
-- Navigation search / command palette (Ctrl+K)
-- Nested sub-groups (multi-level hierarchy)
-- Badge counters on nav items (e.g. pending tickets count)
-- Navigation analytics (most clicked items)
-- Shared team navigation layouts
-
-## ☕ Support
-
-If this plugin saves you time, consider buying me a coffee!
-
-<a href="https://buymeacoffee.com/pown3d">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" />
-</a>
+- Issues and feature requests: [github.com/pOwn3d/payload-nav-studio/issues](https://github.com/pOwn3d/payload-nav-studio/issues)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- If this plugin saves you time: [buy me a coffee](https://buymeacoffee.com/pown3d)
 
 ## License
 
-[MIT](LICENSE)
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-<div align="center">
-
-### Author
-
-**Made with passion by [ConsilioWEB](https://consilioweb.fr)**
-
-<a href="https://www.linkedin.com/in/christophe-lopez/">
-  <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
-</a>
-<a href="https://github.com/pOwn3d">
-  <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
-</a>
-<a href="https://consilioweb.fr">
-  <img src="https://img.shields.io/badge/Website-consilioweb.fr-3B82F6?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website">
-</a>
-
-<br><br>
-
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer" width="100%"/>
-
-</div>
+[MIT](LICENSE) — [ConsilioWEB](https://consilioweb.fr)

@@ -109,6 +109,51 @@ function clearCache(): void {
   }
 }
 
+/** Inputs of the stored-layout decision, isolated from any I/O. */
+export interface ResolveLayoutArgs {
+  /** Version recorded alongside the stored layout (`null` when absent). */
+  storedVersion: number | null
+  /** Fingerprint of the nav currently served (`undefined` when unknown). */
+  currentVersion: number | undefined
+  /** Groups read back from the stored preferences (`null` when there are none). */
+  storedGroups: NavGroupConfig[] | null
+  /** Nav to fall back to. */
+  defaultNav: NavGroupConfig[]
+}
+
+export interface ResolvedLayout {
+  layout: NavGroupConfig[]
+  isCustom: boolean
+  /** True when the stored preferences are stale and must be deleted server-side. */
+  discardStored: boolean
+}
+
+/**
+ * Decide which layout to display, and whether the stored one is stale.
+ *
+ * Pure on purpose: the migration deletes the only thing this plugin persists,
+ * so the decision must be readable and checkable on its own. The four cases:
+ * current version unknown → never discard; no stored version → keep the stored
+ * layout; versions equal → keep; versions differ → discard.
+ */
+export function resolveLayout({
+  storedVersion,
+  currentVersion,
+  storedGroups,
+  defaultNav,
+}: ResolveLayoutArgs): ResolvedLayout {
+  const versionMismatch =
+    currentVersion !== undefined && storedVersion !== null && storedVersion !== currentVersion
+
+  if (versionMismatch) {
+    return { layout: defaultNav, isCustom: false, discardStored: true }
+  }
+  if (storedGroups) {
+    return { layout: storedGroups, isCustom: true, discardStored: false }
+  }
+  return { layout: defaultNav, isCustom: false, discardStored: false }
+}
+
 /**
  * Hook to fetch, save, and reset nav preferences for the current user.
  * Falls back to the default nav from the plugin config endpoint.
@@ -162,34 +207,26 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       navVersionRef.current = currentNavVersion
       setDefaultNav(newDefaultNav)
 
-      let newLayout: NavGroupConfig[]
-      let newIsCustom: boolean
-
       // Version migration: if the stored preferences were saved against a
       // different nav structure (version mismatch), discard them so the
       // user gets the updated default navigation instead of a stale layout.
       const storedVersion: number | null = prefsData.version ?? null
-      const versionMismatch =
-        currentNavVersion !== undefined &&
-        storedVersion !== null &&
-        storedVersion !== currentNavVersion
+      const storedGroups: NavGroupConfig[] | null = prefsData.navLayout?.groups ?? null
+      const { layout: newLayout, isCustom: newIsCustom, discardStored } = resolveLayout({
+        storedVersion,
+        currentVersion: currentNavVersion,
+        storedGroups,
+        defaultNav: newDefaultNav,
+      })
 
-      if (versionMismatch) {
+      if (discardStored) {
         console.info('[admin-nav] Nav structure changed (stored version %d, current %d) — resetting preferences to defaults', storedVersion, currentNavVersion)
         // Fire-and-forget: delete stale preferences on the server
         fetch(`${basePath}/preferences`, { method: 'DELETE' }).catch(() => {})
-        newLayout = newDefaultNav
-        newIsCustom = false
-      } else if (prefsData.navLayout && prefsData.navLayout.groups) {
-        newLayout = prefsData.navLayout.groups
-        newIsCustom = true
-      } else {
-        newLayout = newDefaultNav
-        newIsCustom = false
       }
 
       // Restore collapsed groups from server preferences (skip if version mismatch — groups may no longer exist)
-      if (!versionMismatch) {
+      if (!discardStored) {
         const serverCollapsed: string[] = prefsData.collapsedGroups ?? []
         if (serverCollapsed.length > 0) {
           setCollapsedGroupsState(serverCollapsed)
@@ -254,7 +291,32 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
   const save = useCallback(async (groups: NavGroupConfig[]): Promise<boolean> => {
     setIsSaving(true)
     try {
-      const navLayout: NavLayout = { groups, version: navVersionRef.current ?? 1 }
+      // Saving with a guessed version (the old `?? 1`) was destructive: the next
+      // load compared 1 against the real nav fingerprint, called that a
+      // migration and deleted the layout we had just stored. The version is
+      // unknown whenever the fresh-cache short-circuit skipped the fetch, so
+      // fetch it once rather than guessing — and give up rather than write it wrong.
+      let version = navVersionRef.current
+      if (version === undefined) {
+        try {
+          const metaRes = await fetch(`${basePath}/default-nav`)
+          if (metaRes.ok) {
+            const metaData = await metaRes.json()
+            if (typeof metaData?.navVersion === 'number') {
+              version = metaData.navVersion
+              navVersionRef.current = version
+            }
+          }
+        } catch {
+          // handled below
+        }
+      }
+      if (version === undefined) {
+        console.warn('[admin-nav] Cannot save layout: nav version unknown (server unreachable?)')
+        return false
+      }
+
+      const navLayout: NavLayout = { groups, version }
       const res = await fetch(`${basePath}/preferences`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -264,8 +326,9 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       if (res.ok) {
         setLayout(groups)
         setIsCustom(true)
-        // Update cache immediately
-        writeCache(groups, defaultNav, true)
+        // Update cache immediately — including the version, otherwise the next
+        // mount reads back a cache with no version and guesses again.
+        writeCache(groups, defaultNav, true, version)
         return true
       }
       return false
@@ -283,8 +346,8 @@ export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPr
       if (res.ok) {
         setLayout(defaultNav)
         setIsCustom(false)
-        // Update cache with defaults
-        writeCache(defaultNav, defaultNav, false)
+        // Update cache with defaults, version included (see save()).
+        writeCache(defaultNav, defaultNav, false, navVersionRef.current)
         return true
       }
       return false

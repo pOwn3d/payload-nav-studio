@@ -9,7 +9,7 @@ export {
 } from './endpoints/preferences.js'
 export { createBadgesHandler } from './endpoints/badges.js'
 export { getIconNames, getIconPath, iconPaths } from './icons.js'
-export { resolveLabel, isMultiLang, computeNavFingerprint, dedupeNavItems } from './utils.js'
+export { resolveLabel, isMultiLang, isSafeHref, computeNavFingerprint, dedupeNavItems } from './utils.js'
 
 // Types
 export type {
@@ -19,6 +19,7 @@ export type {
   NavGroupConfig,
   NavLayout,
   AdminNavPluginConfig,
+  AdminNavBrandConfig,
   NavBadgeFn,
   NavBadgesPayload,
 } from './types.js'

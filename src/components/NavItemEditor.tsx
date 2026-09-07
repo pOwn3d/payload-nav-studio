@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { IconPicker } from './IconPicker.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavItemConfig, LocalizedString } from '../types.js'
-import { isMultiLang, resolveLabel } from '../utils.js'
+import { isMultiLang, isSafeHref, resolveLabel } from '../utils.js'
 
 interface NavItemEditorProps {
   item: NavItemConfig
@@ -53,18 +53,11 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
   const availableLangs = i18nLanguages?.filter((l) => l !== 'cimode') || [i18n.language]
 
   const handleSave = () => {
-    // Validate href — must start with '/' or be empty, reject dangerous protocols
+    // Same rule as the server-side validator (isSafeHref): relative paths only.
     const trimmedHref = href.trim()
-    if (trimmedHref) {
-      const hrefLower = trimmedHref.toLowerCase()
-      if (!hrefLower.startsWith('/')) {
-        alert('URL must start with /')
-        return
-      }
-      if (hrefLower.startsWith('javascript:') || hrefLower.startsWith('data:')) {
-        alert('Forbidden URL protocol')
-        return
-      }
+    if (!isSafeHref(trimmedHref)) {
+      alert('URL must be a relative path starting with /')
+      return
     }
 
     const finalLabel = getFinalLabel()
@@ -107,6 +100,12 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
     if (!trimmedLabel) {
       // If label is empty, remove the child (was a cancelled new child)
       removeChild(editingChildIndex)
+      return
+    }
+    // Children bypassed href validation entirely — the server rejects unsafe
+    // hrefs, so check here too instead of failing the whole save later.
+    if (!isSafeHref(trimmedHref)) {
+      alert('URL must be a relative path starting with /')
       return
     }
     const updated = [...children]

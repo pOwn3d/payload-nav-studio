@@ -86,3 +86,29 @@ export function dedupeNavItems(groups: NavGroupConfig[]): NavGroupConfig[] {
 
   return result
 }
+
+/** Link protocols that must never appear in a nav href. */
+const FORBIDDEN_HREF_PROTOCOLS = ['javascript:', 'data:', 'vbscript:']
+
+/**
+ * Whether a nav href is safe to store and render.
+ *
+ * Only same-origin absolute paths are accepted. An empty href is allowed: it
+ * marks a non-navigating entry (a parent that only opens its children).
+ *
+ * Rejects protocol-relative URLs (`//evil.com`, and the `/\evil.com` variant
+ * browsers normalise the same way), which are off-site navigations that the
+ * "must start with /" rule alone lets through.
+ */
+export function isSafeHref(href: string): boolean {
+  // Strip raw TAB, LF and CR anywhere in the string, not just at the ends: the
+  // WHATWG URL parser removes them before resolving, so `/<TAB>/evil.com` is
+  // navigated to as `https://evil.com/`. Trimming alone leaves the internal
+  // ones in place, and the protocol-relative check below would then inspect a
+  // different string than the browser acts on.
+  const value = href.replace(/[\t\n\r]/g, '').trim().toLowerCase()
+  if (value === '') return true
+  if (FORBIDDEN_HREF_PROTOCOLS.some((protocol) => value.startsWith(protocol))) return false
+  if (value.startsWith('//') || value.startsWith('/\\')) return false
+  return value.startsWith('/')
+}

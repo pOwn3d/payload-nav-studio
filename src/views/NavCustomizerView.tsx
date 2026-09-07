@@ -4,10 +4,8 @@
  */
 
 import type { AdminViewServerProps } from 'payload'
-// @ts-ignore — @payloadcms/next is a peer dependency
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import React from 'react'
-// @ts-ignore — next is a peer dependency
 import { redirect } from 'next/navigation'
 import { NavCustomizerViewClient } from './NavCustomizerViewClient.js'
 

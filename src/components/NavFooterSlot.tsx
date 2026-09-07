@@ -20,10 +20,12 @@ import React, { useEffect, useState } from 'react'
  * the import path to be statically analyzable, so we accept only a small
  * set of well-known prefixes you can adapt to your project layout.
  */
-const NavFooterSlot: React.FC<{ path: string; fallback: React.ReactNode }> = ({
-  path,
-  fallback,
-}) => {
+const NavFooterSlot: React.FC<{
+  path: string
+  fallback: React.ReactNode
+  /** Name of the option that provided `path`, used in the failure warning. */
+  slot?: string
+}> = ({ path, fallback, slot = 'navFooterSlot' }) => {
   const [Component, setComponent] = useState<React.ComponentType | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -49,14 +51,14 @@ const NavFooterSlot: React.FC<{ path: string; fallback: React.ReactNode }> = ({
       .catch((err) => {
         if (cancelled) return
         // eslint-disable-next-line no-console
-        console.warn(`[admin-nav] navFooterSlot failed to load "${path}":`, err)
+        console.warn(`[admin-nav] ${slot} failed to load "${path}":`, err)
         setFailed(true)
       })
 
     return () => {
       cancelled = true
     }
-  }, [path])
+  }, [path, slot])
 
   if (failed) return <>{fallback}</>
   if (!Component) return null // suspense-free placeholder; fallback shows on failure only

@@ -26,7 +26,7 @@ import { GroupEditor } from './GroupEditor.js'
 import { NavItemEditor } from './NavItemEditor.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig, NavItemConfig } from '../types.js'
-import { resolveLabel } from '../utils.js'
+import { isSafeHref, resolveLabel } from '../utils.js'
 
 // ── Constants ──
 
@@ -39,7 +39,28 @@ function cloneGroups(groups: NavGroupConfig[]): NavGroupConfig[] {
   return JSON.parse(JSON.stringify(groups))
 }
 
-/** Validate that a JSON value looks like a valid NavGroupConfig[] */
+/**
+ * Validate that a JSON value looks like a valid NavGroupConfig[].
+ *
+ * Mirrors the server-side validator: an imported file that omits `icon` or
+ * nests unchecked children crashes the sidebar (`item.icon.startsWith('#')`),
+ * and an unsafe href would only be rejected later, on save.
+ */
+function isValidNavEntry(value: unknown, depth: number): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const entry = value as Partial<NavItemConfig>
+  if (typeof entry.id !== 'string' || entry.id.length === 0) return false
+  if (typeof entry.href !== 'string' || !isSafeHref(entry.href)) return false
+  if (typeof entry.icon !== 'string') return false
+  if (entry.label === undefined || entry.label === null) return false
+  if (entry.children !== undefined && entry.children !== null) {
+    if (!Array.isArray(entry.children) || depth >= 2) return false
+    if (entry.children.length > 50) return false
+    if (!entry.children.every((child) => isValidNavEntry(child, depth + 1))) return false
+  }
+  return true
+}
+
 function isValidNavConfig(data: unknown): data is NavGroupConfig[] {
   if (!Array.isArray(data)) return false
   return data.every(
@@ -49,14 +70,7 @@ function isValidNavConfig(data: unknown): data is NavGroupConfig[] {
       typeof g.id === 'string' &&
       g.title !== undefined &&
       Array.isArray(g.items) &&
-      g.items.every(
-        (i: unknown) =>
-          typeof i === 'object' &&
-          i !== null &&
-          typeof (i as NavItemConfig).id === 'string' &&
-          typeof (i as NavItemConfig).href === 'string' &&
-          (i as NavItemConfig).label !== undefined,
-      ),
+      g.items.every((i: unknown) => isValidNavEntry(i, 1)),
   )
 }
 
