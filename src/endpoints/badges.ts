@@ -1,5 +1,6 @@
 import type { PayloadHandler } from 'payload'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
+import { requireAdmin } from '../utils/requireAdmin.js'
 import type { NavGroupConfig, NavChildConfig } from '../types.js'
 
 /** Extract user ID from request (works with object or primitive) */
@@ -22,9 +23,10 @@ function getUserId(req: { user?: unknown }): string | number {
  */
 export function createBadgesHandler(defaultNav: NavGroupConfig[]): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Badge resolvers run through the Local API without access control:
+    // restrict the endpoint to admin-panel users.
+    const denied = await requireAdmin(req)
+    if (denied) return denied
 
     const userId = getUserId(req)
     const { allowed, retryAfter } = rateLimit(`admin-nav:badges:${userId}`, 120, 60_000)

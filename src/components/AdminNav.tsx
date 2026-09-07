@@ -15,14 +15,38 @@ import { resolveLabel } from '../utils.js'
 /** localStorage key for the persisted collapsed-rail state (per-browser) */
 const RAIL_STORAGE_KEY = 'admin-nav-rail-collapsed'
 
+/** Icon rendered in place of an unknown icon name — must exist in the registry. */
+const UNKNOWN_ICON_FALLBACK = 'box'
+
+/** Names already reported, so a repeated render doesn't flood the console. */
+const warnedIcons = new Set<string>()
+
+function warnUnknownIcon(name: string): void {
+  if (process.env.NODE_ENV === 'production') return
+  if (warnedIcons.has(name)) return
+  warnedIcons.add(name)
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[admin-nav] Unknown icon "${name}" — falling back to "${UNKNOWN_ICON_FALLBACK}". ` +
+      'Run getIconNames() to list the available icons.',
+  )
+}
+
 /** Inline SVG icon component using the icon registry */
 const NavIcon: React.FC<{ name: string; size?: number; strokeWidth?: number }> = ({
   name,
   size = 17,
   strokeWidth = 1.9,
 }) => {
-  const pathData = getIconPath(name)
-  if (!pathData) return null
+  // An unknown icon name used to render nothing at all, which left the item
+  // silently icon-less. Fall back to a visible generic glyph and warn once per
+  // name in development so the typo is actually noticeable.
+  let pathData = getIconPath(name)
+  if (!pathData) {
+    warnUnknownIcon(name)
+    pathData = getIconPath(UNKNOWN_ICON_FALLBACK)
+    if (!pathData) return null
+  }
 
   // Split compound paths (separated by M or Z followed by M)
   const paths = pathData.split(/(?= M)/).map((p) => p.trim())
@@ -104,10 +128,17 @@ interface BadgesResponse {
   children: Record<string, number>
 }
 
+/** Sidebar header branding resolved server-side from the host config */
+interface NavBrand {
+  wordmark: string | null
+  logoPath: string | null
+}
+
 /** Plugin runtime config received from `/admin-nav/default-nav` */
 interface DefaultNavMeta {
   hasBadges?: boolean
   navFooterSlot?: string | null
+  brand?: NavBrand
 }
 
 /**
@@ -201,7 +232,14 @@ const AdminNav: React.FC = () => {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return
-        setMeta({ hasBadges: !!data.hasBadges, navFooterSlot: data.navFooterSlot ?? null })
+        setMeta({
+          hasBadges: !!data.hasBadges,
+          navFooterSlot: data.navFooterSlot ?? null,
+          brand: {
+            wordmark: typeof data.brand?.wordmark === 'string' ? data.brand.wordmark : null,
+            logoPath: typeof data.brand?.logoPath === 'string' ? data.brand.logoPath : null,
+          },
+        })
       })
       .catch(() => {
         /* silent */
@@ -552,10 +590,24 @@ const AdminNav: React.FC = () => {
             >
               <ChevronIcon direction="left" />
             </button>
-            <div className="admin-nav__brand">
-              <NavLogo />
-              <span className="admin-nav__wordmark">ConsilioWEB</span>
-            </div>
+            {/* Brand comes from the host config (see the `brand` plugin option):
+                no host identity → no brand block, never a hardcoded name. */}
+            {(meta.brand?.logoPath || meta.brand?.wordmark) && (
+              <div className="admin-nav__brand">
+                {meta.brand.logoPath ? (
+                  <NavFooterSlot
+                    path={meta.brand.logoPath}
+                    slot="brand.logoPath"
+                    fallback={<NavLogo />}
+                  />
+                ) : (
+                  <NavLogo />
+                )}
+                {meta.brand.wordmark && (
+                  <span className="admin-nav__wordmark">{meta.brand.wordmark}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 

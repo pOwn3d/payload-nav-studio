@@ -87,6 +87,32 @@ export interface NavBadgesPayload {
   children: Record<string, number>
 }
 
+/**
+ * Branding of the sidebar header (logo + wordmark).
+ *
+ * Left unset, the plugin uses the host's own identity — `admin.meta.title`,
+ * then `admin.meta.titleSuffix` — and renders no brand at all when the host
+ * declares none. It never displays the plugin author's name.
+ */
+export interface AdminNavBrandConfig {
+  /**
+   * Text displayed next to the logo. `false` removes the wordmark.
+   * Default: `admin.meta.title`, else `admin.meta.titleSuffix`, else none.
+   */
+  wordmark?: string | false
+  /**
+   * Component path for a custom logo, resolved at runtime like `navFooterSlot`:
+   * the browser performs a native dynamic import, so the path must be one it can
+   * resolve (a URL or an entry of the app's import map), not a Payload component
+   * path — those are resolved server-side by the importMap and never reach the
+   * client. When the import fails, the built-in neutral glyph is shown.
+   *
+   * Default: none — the plugin's built-in neutral glyph. The host's
+   * `admin.components.graphics.Logo` is deliberately NOT used as a default.
+   */
+  logoPath?: string | false
+}
+
 /** Plugin configuration options */
 export interface AdminNavPluginConfig {
   /**
@@ -121,4 +147,9 @@ export interface AdminNavPluginConfig {
    * If not set, the default Customize link is rendered.
    */
   navFooterSlot?: string
+  /**
+   * Sidebar header branding. Defaults to the host's own admin identity —
+   * see `AdminNavBrandConfig`.
+   */
+  brand?: AdminNavBrandConfig
 }

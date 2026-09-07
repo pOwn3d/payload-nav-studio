@@ -1,5 +1,136 @@
 import type { PayloadHandler } from 'payload'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
+import { requireAdmin } from '../utils/requireAdmin.js'
+import { isSafeHref } from '../utils.js'
+
+/**
+ * Hard ceiling on the PATCH body.
+ *
+ * `req.json()` buffers the whole body in memory: Payload only caps multipart
+ * uploads and Next caps nothing on route handlers, so an unbounded body blows
+ * the heap and takes the CMS down — and a 30 req/min limit does not help when
+ * one request is enough.
+ *
+ * Enforced from `Content-Length`, which every JSON client sets. A chunked body
+ * without that header cannot be pre-checked here; the nested caps below still
+ * bound what can be persisted.
+ */
+const MAX_BODY_BYTES = 256 * 1024
+const MAX_GROUPS = 50
+const MAX_ITEMS_PER_GROUP = 100
+const MAX_CHILDREN = 50
+const MAX_ID_LENGTH = 100
+const MAX_LABEL_LENGTH = 200
+const MAX_ICON_LENGTH = 50
+/** Items → children. Deeper nesting is not part of the nav model. */
+const MAX_ENTRY_DEPTH = 2
+
+/** Validate a label (string or per-language record). Returns an error message or null. */
+function validateLabel(label: unknown, path: string): string | null {
+  if (typeof label === 'string') {
+    return label.length > MAX_LABEL_LENGTH ? `${path}.label exceeds ${MAX_LABEL_LENGTH} chars` : null
+  }
+  if (typeof label === 'object' && label !== null && !Array.isArray(label)) {
+    for (const [lang, value] of Object.entries(label as Record<string, unknown>)) {
+      if (typeof value !== 'string') return `${path}.label.${lang} must be a string`
+      if (value.length > MAX_LABEL_LENGTH) {
+        return `${path}.label.${lang} exceeds ${MAX_LABEL_LENGTH} chars`
+      }
+    }
+    return null
+  }
+  return `${path}.label is required and must be a string or a per-language object`
+}
+
+/**
+ * Validate one nav entry (item or child) and, recursively, its children.
+ *
+ * `href` and `icon` are required *strings*: the nav mounted in `beforeNavLinks`
+ * calls `item.href.includes('?')` and `item.icon.startsWith('#')`, so a missing
+ * value crashes the whole admin sidebar. Empty strings stay legal — that is how
+ * the customizer stores a parent entry that only opens its children.
+ */
+function validateNavEntry(entry: unknown, path: string, depth: number): string | null {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+    return `${path} must be an object`
+  }
+  const item = entry as Record<string, unknown>
+
+  if (typeof item.id !== 'string' || item.id.length === 0 || item.id.length > MAX_ID_LENGTH) {
+    return `${path}.id must be a non-empty string (max ${MAX_ID_LENGTH} chars)`
+  }
+
+  if (typeof item.href !== 'string') return `${path}.href is required and must be a string`
+  if (!isSafeHref(item.href)) {
+    return `${path}.href must be a relative path starting with '/' (no external or scripted URL)`
+  }
+
+  const labelError = validateLabel(item.label, path)
+  if (labelError) return labelError
+
+  if (typeof item.icon !== 'string' || item.icon.length > MAX_ICON_LENGTH) {
+    return `${path}.icon is required and must be a string (max ${MAX_ICON_LENGTH} chars)`
+  }
+
+  if (item.children !== undefined && item.children !== null) {
+    if (!Array.isArray(item.children)) return `${path}.children must be an array`
+    if (depth >= MAX_ENTRY_DEPTH) return `${path}.children exceeds the maximum nesting depth`
+    if (item.children.length > MAX_CHILDREN) {
+      return `${path}.children exceeds maximum of ${MAX_CHILDREN} entries`
+    }
+    for (let k = 0; k < item.children.length; k++) {
+      const childError = validateNavEntry(item.children[k], `${path}.children[${k}]`, depth + 1)
+      if (childError) return childError
+    }
+  }
+
+  return null
+}
+
+/** Validate a full navLayout payload. Returns an error message or null. */
+function validateNavLayout(navLayout: unknown): string | null {
+  if (typeof navLayout !== 'object' || navLayout === null || Array.isArray(navLayout)) {
+    return 'navLayout must be an object'
+  }
+
+  const layout = navLayout as Record<string, unknown>
+
+  // A navLayout without groups used to skip every check below and be persisted
+  // as-is, producing a stored layout the customizer cannot read back.
+  if (!Array.isArray(layout.groups)) return 'navLayout.groups must be an array'
+  if (layout.groups.length > MAX_GROUPS) {
+    return `navLayout.groups exceeds maximum of ${MAX_GROUPS} groups`
+  }
+
+  for (let i = 0; i < layout.groups.length; i++) {
+    const groupPath = `navLayout.groups[${i}]`
+    const group = layout.groups[i] as Record<string, unknown> | undefined
+    if (!group || typeof group !== 'object' || Array.isArray(group)) {
+      return `${groupPath} must be an object`
+    }
+
+    // Groups can use either 'title' or 'label' for the group name
+    const groupTitle = group.title ?? group.label
+    if (groupTitle === undefined || groupTitle === null) {
+      return `${groupPath}.title is required`
+    }
+    if (typeof groupTitle !== 'string' && typeof groupTitle !== 'object') {
+      return `${groupPath}.title must be a string or object`
+    }
+
+    if (!Array.isArray(group.items)) return `${groupPath}.items must be an array`
+    if (group.items.length > MAX_ITEMS_PER_GROUP) {
+      return `${groupPath}.items exceeds maximum of ${MAX_ITEMS_PER_GROUP} items`
+    }
+
+    for (let j = 0; j < group.items.length; j++) {
+      const itemError = validateNavEntry(group.items[j], `${groupPath}.items[${j}]`, 1)
+      if (itemError) return itemError
+    }
+  }
+
+  return null
+}
 
 /** Extract user ID from request (works with object or primitive) */
 function getUserId(req: { user?: unknown }): string | number {
@@ -14,9 +145,9 @@ function getUserId(req: { user?: unknown }): string | number {
  */
 export function createGetPreferencesHandler(collectionSlug: string): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Authenticated is not enough: these endpoints are admin-panel only.
+    const denied = await requireAdmin(req)
+    if (denied) return denied
 
     const userId = getUserId(req)
     const { allowed, retryAfter } = rateLimit(`admin-nav:get:${userId}`, 60, 60_000)
@@ -25,7 +156,7 @@ export function createGetPreferencesHandler(collectionSlug: string): PayloadHand
     try {
       const result = await req.payload.find({
         collection: collectionSlug as any,
-        where: { user: { equals: req.user.id } },
+        where: { user: { equals: userId } },
         limit: 1,
         depth: 0,
       })
@@ -50,13 +181,21 @@ export function createGetPreferencesHandler(collectionSlug: string): PayloadHand
  */
 export function createSavePreferencesHandler(collectionSlug: string): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const denied = await requireAdmin(req)
+    if (denied) return denied
 
     const userId = getUserId(req)
     const { allowed, retryAfter } = rateLimit(`admin-nav:patch:${userId}`, 30, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
+
+    // Reject oversized bodies before buffering them into memory.
+    const contentLength = Number(req.headers?.get('content-length') ?? Number.NaN)
+    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+      return Response.json(
+        { error: `Payload too large (max ${MAX_BODY_BYTES} bytes)` },
+        { status: 413 },
+      )
+    }
 
     let body: Record<string, unknown>
     try {
@@ -74,88 +213,8 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
 
     // Validate navLayout structure if provided
     if (navLayout !== undefined && navLayout !== null) {
-      if (typeof navLayout !== 'object' || Array.isArray(navLayout)) {
-        return Response.json({ error: 'navLayout must be an object' }, { status: 400 })
-      }
-
-      const layout = navLayout as Record<string, unknown>
-      if (layout.groups !== undefined) {
-        if (!Array.isArray(layout.groups)) {
-          return Response.json({ error: 'navLayout.groups must be an array' }, { status: 400 })
-        }
-
-        if (layout.groups.length > 50) {
-          return Response.json({ error: 'navLayout.groups exceeds maximum of 50 groups' }, { status: 400 })
-        }
-
-        for (let i = 0; i < layout.groups.length; i++) {
-          const group = layout.groups[i] as Record<string, unknown> | undefined
-          if (!group || typeof group !== 'object') {
-            return Response.json({ error: `navLayout.groups[${i}] must be an object` }, { status: 400 })
-          }
-          // Groups can use either 'title' or 'label' for the group name
-          const groupTitle = group.title ?? group.label
-          if (groupTitle === undefined || groupTitle === null) {
-            return Response.json({ error: `navLayout.groups[${i}].title is required` }, { status: 400 })
-          }
-          if (typeof groupTitle !== 'string' && typeof groupTitle !== 'object') {
-            return Response.json({ error: `navLayout.groups[${i}].title must be a string or object` }, { status: 400 })
-          }
-          if (!Array.isArray(group.items)) {
-            return Response.json({ error: `navLayout.groups[${i}].items must be an array` }, { status: 400 })
-          }
-
-          if (group.items.length > 100) {
-            return Response.json({ error: `navLayout.groups[${i}].items exceeds maximum of 100 items` }, { status: 400 })
-          }
-
-          // Validate each item in the group
-          for (let j = 0; j < (group.items as unknown[]).length; j++) {
-            const item = (group.items as Record<string, unknown>[])[j]
-            if (!item || typeof item !== 'object') {
-              return Response.json({ error: `navLayout.groups[${i}].items[${j}] must be an object` }, { status: 400 })
-            }
-
-            // Validate item.id
-            if (typeof item.id !== 'string' || item.id.length === 0 || item.id.length > 100) {
-              return Response.json({ error: `navLayout.groups[${i}].items[${j}].id must be a non-empty string (max 100 chars)` }, { status: 400 })
-            }
-
-            // Validate item.href — must start with '/' or be empty, reject dangerous protocols
-            if (typeof item.href === 'string') {
-              const hrefLower = item.href.toLowerCase().trim()
-              if (hrefLower && !hrefLower.startsWith('/')) {
-                return Response.json({ error: `navLayout.groups[${i}].items[${j}].href must start with '/' or be empty` }, { status: 400 })
-              }
-              if (hrefLower.startsWith('javascript:') || hrefLower.startsWith('data:')) {
-                return Response.json({ error: `navLayout.groups[${i}].items[${j}].href contains a forbidden protocol` }, { status: 400 })
-              }
-            }
-
-            // Validate item.label — string or Record<string, string>, max 200 chars
-            if (item.label !== undefined) {
-              if (typeof item.label === 'string') {
-                if (item.label.length > 200) {
-                  return Response.json({ error: `navLayout.groups[${i}].items[${j}].label exceeds 200 chars` }, { status: 400 })
-                }
-              } else if (typeof item.label === 'object' && item.label !== null) {
-                for (const val of Object.values(item.label as Record<string, unknown>)) {
-                  if (typeof val === 'string' && val.length > 200) {
-                    return Response.json({ error: `navLayout.groups[${i}].items[${j}].label value exceeds 200 chars` }, { status: 400 })
-                  }
-                }
-              }
-            }
-
-            // Validate item.icon — string, max 50 chars if present
-            if (item.icon !== undefined) {
-              if (typeof item.icon !== 'string' || item.icon.length > 50) {
-                return Response.json({ error: `navLayout.groups[${i}].items[${j}].icon must be a string (max 50 chars)` }, { status: 400 })
-              }
-            }
-          }
-        }
-      }
+      const layoutError = validateNavLayout(navLayout)
+      if (layoutError) return Response.json({ error: layoutError }, { status: 400 })
     }
 
     // Validate collapsedGroups if provided
@@ -167,7 +226,7 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
       // Check if user already has preferences
       const existing = await req.payload.find({
         collection: collectionSlug as any,
-        where: { user: { equals: req.user.id } },
+        where: { user: { equals: userId } },
         limit: 1,
         depth: 0,
       })
@@ -178,7 +237,12 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
       const updateData: Record<string, unknown> = {}
       if (navLayout && typeof navLayout === 'object') {
         updateData.navLayout = navLayout
-        updateData.version = ((navLayout as Record<string, unknown>).version as number) || 1
+        // `|| 1` also rewrote a legitimate version 0 (the nav fingerprint is an
+        // unsigned djb2 hash, so 0 is a valid value) into 1, which the client
+        // then reads back as a version mismatch and wipes the layout.
+        const layoutVersion = (navLayout as Record<string, unknown>).version
+        updateData.version =
+          typeof layoutVersion === 'number' && Number.isFinite(layoutVersion) ? layoutVersion : 1
       }
       if (Array.isArray(collapsedGroups)) {
         updateData.collapsedGroups = collapsedGroups
@@ -196,7 +260,7 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
         await req.payload.create({
           collection: collectionSlug as any,
           data: {
-            user: req.user.id,
+            user: userId,
             ...updateData,
           } as any,
         })
@@ -216,9 +280,8 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
  */
 export function createResetPreferencesHandler(collectionSlug: string): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const denied = await requireAdmin(req)
+    if (denied) return denied
 
     const userId = getUserId(req)
     const { allowed, retryAfter } = rateLimit(`admin-nav:delete:${userId}`, 30, 60_000)
@@ -227,7 +290,7 @@ export function createResetPreferencesHandler(collectionSlug: string): PayloadHa
     try {
       const existing = await req.payload.find({
         collection: collectionSlug as any,
-        where: { user: { equals: req.user.id } },
+        where: { user: { equals: userId } },
         limit: 1,
         depth: 0,
       })

@@ -30,9 +30,10 @@
  *   })
  */
 
-import type { Config, Plugin } from 'payload'
+import type { Config, PayloadRequest, Plugin, SanitizedPermissions } from 'payload'
+import { getAccessResults } from 'payload'
 import { deepMergeSimple } from 'payload/shared'
-import type { AdminNavPluginConfig, NavGroupConfig } from './types.js'
+import type { AdminNavBrandConfig, AdminNavPluginConfig, NavGroupConfig } from './types.js'
 import { createAdminNavPreferencesCollection } from './collections/AdminNavPreferences.js'
 import {
   createGetPreferencesHandler,
@@ -43,60 +44,108 @@ import { createBadgesHandler } from './endpoints/badges.js'
 import { translations } from './translations/index.js'
 import { autoDiscoverNav } from './autoDiscover.js'
 import { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
+import { requireAdmin } from './utils/requireAdmin.js'
 import { computeNavFingerprint, dedupeNavItems } from './utils.js'
+
+/**
+ * A sanitized permission entry is either `true` (unrestricted) or, when the
+ * access function returned a query constraint, `{ permission: true, where }`.
+ * When access is denied the key is stripped from the object entirely, so an
+ * absent value means "no access" — not "unknown".
+ */
+function canRead(perm: unknown): boolean {
+  if (perm === true) return true
+  return (
+    typeof perm === 'object' &&
+    perm !== null &&
+    (perm as { permission?: unknown }).permission === true
+  )
+}
 
 /**
  * Filter navigation groups/items based on user permissions.
  * Removes collections/globals the user cannot read, preventing structure enumeration.
+ *
+ * Permissions come from `getAccessResults` — `payload.auth` is a plain function
+ * and has no `.permissions` property, so the previous acquisition path was a
+ * silent no-op that always returned the unfiltered nav.
  */
 async function filterNavByPermissions(
   groups: NavGroupConfig[],
-  req: any,
+  req: PayloadRequest,
 ): Promise<NavGroupConfig[]> {
-  // Retrieve user permissions from Payload access control
-  let permissions: Record<string, any> | null = null
+  let permissions: SanitizedPermissions
   try {
-    if (req.payload?.auth?.permissions) {
-      permissions = await req.payload.auth.permissions(req)
-    }
+    permissions = await getAccessResults({ req })
   } catch {
-    // If we can't fetch permissions, return the full nav (fail-open for admin UX)
+    // If we can't compute permissions, return the full nav (fail-open for admin UX)
     return groups
   }
 
-  if (!permissions) return groups
+  const collectionPerms = permissions.collections ?? {}
+  const globalPerms = permissions.globals ?? {}
 
-  const collectionPerms = permissions.collections || {}
-  const globalPerms = permissions.globals || {}
+  // Only entities actually registered in the config are subject to filtering;
+  // hrefs pointing at custom routes are left untouched.
+  const knownCollections = new Set((req.payload.config.collections ?? []).map((c) => c.slug))
+  const knownGlobals = new Set((req.payload.config.globals ?? []).map((g) => g.slug))
+
+  /** Permission predicate for a single nav entry, whatever its depth. */
+  const isEntryAllowed = (rawHref: string | undefined): boolean => {
+    const href = rawHref || ''
+
+    // Check collection-based items: /admin/collections/<slug>
+    const collMatch = href.match(/\/admin\/collections\/([^/?#]+)/)
+    if (collMatch) {
+      const slug = collMatch[1] as string
+      if (knownCollections.has(slug)) {
+        return canRead(collectionPerms[slug]?.read)
+      }
+    }
+
+    // Check global-based items: /admin/globals/<slug>
+    const globalMatch = href.match(/\/admin\/globals\/([^/?#]+)/)
+    if (globalMatch) {
+      const slug = globalMatch[1] as string
+      if (knownGlobals.has(slug)) {
+        return canRead(globalPerms[slug]?.read)
+      }
+    }
+
+    // Custom views and other items: allow by default
+    return true
+  }
+
+  /**
+   * Filter entries and their children. Sub-items may point at collections too
+   * (the customizer creates them, and the PATCH validator accepts them), so the
+   * predicate has to run at every depth: filtering only the first level left
+   * children of unreadable collections visible in the sidebar.
+   */
+  const filterEntries = <T extends { href?: string; children?: unknown }>(entries: T[]): T[] => {
+    const kept: T[] = []
+
+    for (const entry of entries) {
+      if (!isEntryAllowed(entry.href)) continue
+
+      const children = entry.children
+      if (Array.isArray(children) && children.length > 0) {
+        const filteredChildren = filterEntries(children as { href?: string; children?: unknown }[])
+        // A parent kept only to hold now-hidden children disappears with them.
+        if (filteredChildren.length === 0 && !(entry.href || '').trim()) continue
+        kept.push({ ...entry, children: filteredChildren } as unknown as T)
+      } else {
+        kept.push(entry)
+      }
+    }
+
+    return kept
+  }
 
   const filtered: NavGroupConfig[] = []
 
   for (const group of groups) {
-    const filteredItems = group.items.filter((item) => {
-      const href = item.href || ''
-
-      // Check collection-based items: /admin/collections/<slug>
-      const collMatch = href.match(/\/admin\/collections\/([^/?#]+)/)
-      if (collMatch) {
-        const slug = collMatch[1]
-        // If permission data exists for this collection, check read access
-        if (collectionPerms[slug] && collectionPerms[slug].read) {
-          return collectionPerms[slug].read.permission !== false
-        }
-      }
-
-      // Check global-based items: /admin/globals/<slug>
-      const globalMatch = href.match(/\/admin\/globals\/([^/?#]+)/)
-      if (globalMatch) {
-        const slug = globalMatch[1]
-        if (globalPerms[slug] && globalPerms[slug].read) {
-          return globalPerms[slug].read.permission !== false
-        }
-      }
-
-      // Custom views and other items: allow by default
-      return true
-    })
+    const filteredItems = filterEntries(group.items ?? [])
 
     // Only include groups that have at least one visible item
     if (filteredItems.length > 0) {
@@ -105,6 +154,75 @@ async function filterNavByPermissions(
   }
 
   return filtered
+}
+
+/** Resolved branding shipped to the client by `/default-nav`. */
+interface ResolvedBrand {
+  wordmark: string | null
+  logoPath: string | null
+}
+
+/** Suffix Payload's own sanitization injects when the host declares none. */
+const PAYLOAD_DEFAULT_TITLE_SUFFIX = '- Payload'
+
+/**
+ * Minimal shape required to read the host identity. Satisfied both by the raw
+ * `Config` and by the final `SanitizedConfig` reachable at `req.payload.config`.
+ */
+interface BrandSourceConfig {
+  admin?: {
+    meta?: {
+      title?: unknown
+      titleSuffix?: unknown
+    }
+  }
+}
+
+/**
+ * Resolve the sidebar header branding.
+ *
+ * The plugin used to hardcode its author's wordmark in every consumer's admin
+ * panel. It now falls back to the host's own identity and displays nothing when
+ * the host declares none.
+ *
+ * Resolved per request against the final `SanitizedConfig`, never against the
+ * config captured while the plugin is being applied: Payload sanitizes the
+ * config afterwards, and plugins registered after admin-nav (admin-ui-pro
+ * branding, admin-theme, ...) declare their `admin.meta` later still.
+ */
+function resolveBrand(
+  brand: AdminNavBrandConfig | undefined,
+  config: BrandSourceConfig,
+): ResolvedBrand {
+  let wordmark: string | null
+  if (brand?.wordmark === false) {
+    wordmark = null
+  } else if (typeof brand?.wordmark === 'string' && brand.wordmark.trim()) {
+    wordmark = brand.wordmark.trim()
+  } else {
+    const meta = config.admin?.meta
+    const title = typeof meta?.title === 'string' ? meta.title.trim() : ''
+    // titleSuffix is written as a separator + name (e.g. " - Acme").
+    // The sanitized config always carries one, so the framework default has to
+    // be discarded: it is Payload's identity, not the host's.
+    const rawSuffix = typeof meta?.titleSuffix === 'string' ? meta.titleSuffix.trim() : ''
+    const suffix =
+      rawSuffix === PAYLOAD_DEFAULT_TITLE_SUFFIX
+        ? ''
+        : rawSuffix.replace(/^[\s\-–—|·:]+/, '').trim()
+    wordmark = title || suffix || null
+  }
+
+  // The logo is only ever an explicit consumer-provided path: the host's
+  // `admin.components.graphics.Logo` is resolved by Payload's server-side
+  // importMap and is meaningless to the client-side dynamic import used here,
+  // so defaulting to it produced a failed import on every mount.
+  let logoPath: string | null = null
+  if (typeof brand?.logoPath === 'string' && brand.logoPath.trim()) {
+    logoPath = brand.logoPath.trim()
+  }
+
+  return { wordmark, logoPath }
 }
 
 export const adminNavPlugin =
@@ -203,9 +321,8 @@ export const adminNavPlugin =
         path: `${basePath}/default-nav`,
         method: 'get' as const,
         handler: async (req) => {
-          if (!req.user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
+          const denied = await requireAdmin(req)
+          if (denied) return denied
 
           const userId = typeof req.user === 'object' ? (req.user as any).id : req.user
           const { allowed, retryAfter } = rateLimit(`admin-nav:default:${userId}`, 60, 60_000)
@@ -214,6 +331,10 @@ export const adminNavPlugin =
           try {
             // Filter nav items based on user permissions to avoid structure enumeration
             const filteredNav = await filterNavByPermissions(defaultNav, req)
+
+            // Sidebar header branding — host identity by default, never the
+            // plugin author's. Read from the final SanitizedConfig (see resolveBrand).
+            const brand = resolveBrand(safeConfig.brand, req.payload.config)
 
             // Detect whether any badge resolver is configured so the client
             // can decide to start the live polling. Functions are not
@@ -235,6 +356,7 @@ export const adminNavPlugin =
               basePath: `/api${basePath}`,
               hasBadges,
               navFooterSlot: safeConfig.navFooterSlot ?? null,
+              brand,
             })
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Internal server error'
@@ -249,9 +371,8 @@ export const adminNavPlugin =
         path: `${basePath}/discover`,
         method: 'get' as const,
         handler: async (req) => {
-          if (!req.user) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
+          const denied = await requireAdmin(req)
+          if (denied) return denied
 
           const userId = typeof req.user === 'object' ? (req.user as any).id : req.user
           const { allowed, retryAfter } = rateLimit(`admin-nav:discover:${userId}`, 30, 60_000)

@@ -106,8 +106,14 @@ const ADMIN_NAV_CSS = `/* ======================================================
    AdminNav — Sidebar navigation
    ================================================================ */
 
-/* Hide default Payload nav groups rendered alongside admin-nav */
-[data-admin-nav] ~ * {
+/* Hide the default Payload nav groups rendered alongside admin-nav.
+   Target them explicitly: in @payloadcms/next's Nav, beforeNavLinks (this
+   plugin), DefaultNavClient, afterNavLinks and .nav__controls are all direct
+   siblings inside .nav__wrap. A general sibling wildcard therefore also hid the
+   settings menu, the logout button, and every afterNavLinks component injected
+   by other plugins. */
+[data-admin-nav] ~ .nav-group,
+[data-admin-nav] ~ .browse-by-folder-button {
   display: none !important;
 }
 
