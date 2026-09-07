@@ -168,7 +168,13 @@ export function resolveLayout({
  * first render. After the first fetch, module vars are populated →
  * subsequent mounts get instant data (no flash).
  */
-export function useNavPreferences(basePath: string = '/api/admin-nav'): UseNavPreferencesReturn {
+/**
+ * Default endpoint prefix, matching `endpointBasePath`'s own default.
+ * Exported so the components and the hook cannot drift apart.
+ */
+export const DEFAULT_BASE_PATH = '/api/admin-nav'
+
+export function useNavPreferences(basePath: string = DEFAULT_BASE_PATH): UseNavPreferencesReturn {
   // Use module cache if available (SPA re-mount), otherwise empty (SSR-safe)
   const [layout, setLayout] = useState<NavGroupConfig[]>(_cachedLayout ?? [])
   const [defaultNav, setDefaultNav] = useState<NavGroupConfig[]>(_cachedDefaultNav ?? [])

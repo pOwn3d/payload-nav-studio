@@ -8,6 +8,7 @@ import { DefaultTemplate } from '@payloadcms/next/templates'
 import React from 'react'
 import { redirect } from 'next/navigation'
 import { NavCustomizerViewClient } from './NavCustomizerViewClient.js'
+import { DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 
 export const NavCustomizerView: React.FC<AdminViewServerProps> = (props) => {
   const { initPageResult } = props
@@ -15,6 +16,12 @@ export const NavCustomizerView: React.FC<AdminViewServerProps> = (props) => {
   if (!initPageResult?.req?.user) { redirect('/admin/login') }
 
   const { req, visibleEntities, permissions, locale } = initPageResult
+
+  // The plugin publishes its resolved endpoint prefix on the config; the
+  // client tree cannot work it out on its own.
+  const resolvedBasePath =
+    (req.payload.config.custom as { adminNav?: { basePath?: string } } | undefined)?.adminNav
+      ?.basePath ?? DEFAULT_BASE_PATH
 
   return (
     <DefaultTemplate
@@ -28,7 +35,7 @@ export const NavCustomizerView: React.FC<AdminViewServerProps> = (props) => {
       user={req.user!}
       visibleEntities={visibleEntities}
     >
-      <NavCustomizerViewClient />
+      <NavCustomizerViewClient basePath={resolvedBasePath} />
     </DefaultTemplate>
   )
 }
