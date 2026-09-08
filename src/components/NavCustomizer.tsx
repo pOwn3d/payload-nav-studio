@@ -684,6 +684,9 @@ export const NavCustomizer: React.FC<{ basePath?: string }> = ({ basePath = DEFA
           type="file"
           accept=".json,application/json"
           className="admin-nav-file-input--hidden"
+          // Visually hidden and driven by the button above, but still a real
+          // focusable control: without a name it announces as "file upload".
+          aria-label={t('plugin-admin-nav:importConfig')}
           onChange={handleImport}
         />
       </div>
@@ -695,6 +698,9 @@ export const NavCustomizer: React.FC<{ basePath?: string }> = ({ basePath = DEFA
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('plugin-admin-nav:searchItems')}
+          // The placeholder is not a name — it vanishes the moment the field is
+          // filled, which is exactly when the user needs it announced.
+          aria-label={t('plugin-admin-nav:searchItems')}
           className="admin-nav-customizer__search-input"
         />
         {searchQuery && (

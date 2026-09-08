@@ -114,5 +114,9 @@ export const fr = {
     busy: 'Occupé',
     away: 'Absent',
     offline: 'Hors ligne',
+
+    // Frontière d'erreur de rendu
+    viewCrashed: "Cette vue n'a pas pu s'afficher",
+    retry: 'Réessayer',
   },
 }

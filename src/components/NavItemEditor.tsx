@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { IconPicker } from './IconPicker.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavItemConfig, LocalizedString } from '../types.js'
@@ -145,17 +145,66 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
     else if (editingChildIndex === target) setEditingChildIndex(index)
   }
 
+  // `useId()` rather than literal ids: the customizer can mount this editor
+  // several times in one page, and duplicated ids break the very `htmlFor`
+  // association they are here to create.
+  const fieldId = useId()
+  const labelId = `${fieldId}-label`
+  const hrefId = `${fieldId}-href`
+  const titleId = `${fieldId}-title`
+  const childLabelId = `${fieldId}-child-label`
+  const childHrefId = `${fieldId}-child-href`
+  const childIconId = `${fieldId}-child-icon`
+
+  // Keyboard parity with the click-outside dismissal below. Without it, closing
+  // the dialog was mouse-only.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
-    <div className="admin-nav-modal-overlay" onClick={onCancel}>
-      <div className="admin-nav-modal admin-nav-modal--md" onClick={(e) => e.stopPropagation()}>
-        <h3 className="admin-nav-modal__title">
+    // `role="presentation"` on the backdrop and the `target === currentTarget`
+    // test replace the previous pair of handlers: the inner element carried an
+    // `onClick` whose only job was `stopPropagation`, which made a plain
+    // container look like a control to assistive technology.
+    <div
+      className="admin-nav-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel()
+      }}
+    >
+      {/* `role="dialog"` + `aria-labelledby` announce the container and name it.
+          `aria-modal` is deliberately NOT claimed: nothing confines Tab to this
+          subtree yet, and telling assistive technology the rest of the page is
+          inert while it is still reachable by keyboard is worse than saying
+          nothing. Escape closes it, which is the parity the backdrop click
+          was missing. */}
+      <div
+        className="admin-nav-modal admin-nav-modal--md"
+        role="dialog"
+        aria-labelledby={titleId}
+      >
+        <h3 className="admin-nav-modal__title" id={titleId}>
           {t('plugin-admin-nav:editItem')}
         </h3>
 
         {/* Label */}
         <div className="admin-nav-modal__field-group">
           <div className="admin-nav-modal__field-row">
-            <label className="admin-nav-modal__label admin-nav-modal__label--inline">{t('plugin-admin-nav:labelField')}</label>
+            {/* In multi-language mode the single input is replaced by one per
+                language, so the shared label points at the first of them rather
+                than at an id nothing renders. */}
+            <label
+              className="admin-nav-modal__label admin-nav-modal__label--inline"
+              htmlFor={useMultiLang ? `${labelId}-${availableLangs[0]}` : labelId}
+            >
+              {t('plugin-admin-nav:labelField')}
+            </label>
             <label className="admin-nav-modal__multilang-toggle">
               <input
                 type="checkbox"
@@ -177,9 +226,13 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
             <div className="admin-nav-modal__multilang-fields">
               {availableLangs.map((lang) => (
                 <div key={lang} className="admin-nav-modal__lang-row">
-                  <span className="admin-nav-modal__lang-code">{lang}</span>
+                  {/* The language code is the only per-input name available, so
+                      it is a real <label> rather than a decorative <span>. */}
+                  <label className="admin-nav-modal__lang-code" htmlFor={`${labelId}-${lang}`}>{lang}</label>
                   <input
                     type="text"
+                    id={`${labelId}-${lang}`}
+                    aria-label={`${t('plugin-admin-nav:labelField')} (${lang})`}
                     value={labelRecord[lang] || ''}
                     onChange={(e) => setLabelRecord((prev) => ({ ...prev, [lang]: e.target.value }))}
                     className="admin-nav-modal__input"
@@ -189,21 +242,30 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
               ))}
             </div>
           ) : (
-            <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} className="admin-nav-modal__input" />
+            <input type="text" id={labelId} value={label} onChange={(e) => setLabel(e.target.value)} className="admin-nav-modal__input" />
           )}
         </div>
 
         {/* URL */}
         <div className="admin-nav-modal__field-group">
-          <label className="admin-nav-modal__label">{t('plugin-admin-nav:urlField')}</label>
-          <input type="text" value={href} onChange={(e) => setHref(e.target.value)} className="admin-nav-modal__input" />
+          <label className="admin-nav-modal__label" htmlFor={hrefId}>{t('plugin-admin-nav:urlField')}</label>
+          <input type="text" id={hrefId} value={href} onChange={(e) => setHref(e.target.value)} className="admin-nav-modal__input" />
         </div>
 
         {/* Icon */}
         <div className="admin-nav-modal__field-group admin-nav-modal__field-group--relative">
-          <label className="admin-nav-modal__label">{t('plugin-admin-nav:iconField')}</label>
+          {/* A <label> cannot name a <button>: `htmlFor` only targets form
+              controls, so this caption is a <span> (the class already carries
+              `display: block`, so nothing moves) and the button names itself.
+              The name includes the current value because the button's only
+              content is the icon name — or, for a colour, a bare dot with no
+              text at all. */}
+          <span className="admin-nav-modal__label">{t('plugin-admin-nav:iconField')}</span>
           <button
+            type="button"
             onClick={() => setShowIconPicker(!showIconPicker)}
+            aria-expanded={showIconPicker}
+            aria-label={`${t('plugin-admin-nav:iconField')}: ${icon}`}
             className="admin-nav-modal__input admin-nav-modal__input--icon-btn"
           >
             {icon.startsWith('#') ? (
@@ -271,13 +333,13 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
                   </span>
                   {/* Action buttons */}
                   <div className="admin-nav-submenus__child-actions">
-                    <button type="button" onClick={() => moveChild(index, -1)} disabled={index === 0} title={t('plugin-admin-nav:moveUp')}
+                    <button type="button" onClick={() => moveChild(index, -1)} disabled={index === 0} title={t('plugin-admin-nav:moveUp')} aria-label={t('plugin-admin-nav:moveUp')}
                       className={`admin-nav-submenus__child-action-btn ${index === 0 ? 'admin-nav-submenus__child-action-btn--disabled' : 'admin-nav-submenus__child-action-btn--enabled'}`}>&#x2191;</button>
-                    <button type="button" onClick={() => moveChild(index, 1)} disabled={index === children.length - 1} title={t('plugin-admin-nav:moveDown')}
+                    <button type="button" onClick={() => moveChild(index, 1)} disabled={index === children.length - 1} title={t('plugin-admin-nav:moveDown')} aria-label={t('plugin-admin-nav:moveDown')}
                       className={`admin-nav-submenus__child-action-btn ${index === children.length - 1 ? 'admin-nav-submenus__child-action-btn--disabled' : 'admin-nav-submenus__child-action-btn--enabled'}`}>&#x2193;</button>
-                    <button type="button" onClick={() => startEditChild(index)} title={t('plugin-admin-nav:edit')}
+                    <button type="button" onClick={() => startEditChild(index)} title={t('plugin-admin-nav:edit')} aria-label={t('plugin-admin-nav:edit')}
                       className="admin-nav-submenus__child-action-btn admin-nav-submenus__child-action-btn--enabled">&#x270F;&#xFE0F;</button>
-                    <button type="button" onClick={() => removeChild(index)} title={t('plugin-admin-nav:delete')}
+                    <button type="button" onClick={() => removeChild(index)} title={t('plugin-admin-nav:delete')} aria-label={t('plugin-admin-nav:delete')}
                       className="admin-nav-submenus__child-action-btn admin-nav-submenus__child-action-btn--delete">&#x2715;</button>
                   </div>
                 </div>
@@ -287,18 +349,18 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
               {editingChildIndex === index && (
                 <div className="admin-nav-submenus__edit-form">
                   <div className="admin-nav-submenus__edit-field">
-                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:labelField')}</label>
-                    <input type="text" value={childDraft.label} onChange={(e) => setChildDraft({ ...childDraft, label: e.target.value })}
+                    <label className="admin-nav-submenus__edit-label" htmlFor={childLabelId}>{t('plugin-admin-nav:labelField')}</label>
+                    <input type="text" id={childLabelId} value={childDraft.label} onChange={(e) => setChildDraft({ ...childDraft, label: e.target.value })}
                       className="admin-nav-submenus__edit-input" autoFocus placeholder={t('plugin-admin-nav:childLabelPlaceholder')} />
                   </div>
                   <div className="admin-nav-submenus__edit-field">
-                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:urlField')}</label>
-                    <input type="text" value={childDraft.href} onChange={(e) => setChildDraft({ ...childDraft, href: e.target.value })}
+                    <label className="admin-nav-submenus__edit-label" htmlFor={childHrefId}>{t('plugin-admin-nav:urlField')}</label>
+                    <input type="text" id={childHrefId} value={childDraft.href} onChange={(e) => setChildDraft({ ...childDraft, href: e.target.value })}
                       className="admin-nav-submenus__edit-input" placeholder={t('plugin-admin-nav:childUrlPlaceholder')} />
                   </div>
                   <div className="admin-nav-submenus__edit-field--last">
-                    <label className="admin-nav-submenus__edit-label">{t('plugin-admin-nav:childIconLabel')}</label>
-                    <input type="text" value={childDraft.icon} onChange={(e) => setChildDraft({ ...childDraft, icon: e.target.value })}
+                    <label className="admin-nav-submenus__edit-label" htmlFor={childIconId}>{t('plugin-admin-nav:childIconLabel')}</label>
+                    <input type="text" id={childIconId} value={childDraft.icon} onChange={(e) => setChildDraft({ ...childDraft, icon: e.target.value })}
                       className="admin-nav-submenus__edit-input" placeholder={t('plugin-admin-nav:childIconPlaceholder')} />
                   </div>
                   <div className="admin-nav-submenus__edit-actions">
@@ -317,10 +379,10 @@ export const NavItemEditor: React.FC<NavItemEditorProps> = ({ item, onSave, onCa
 
         {/* Actions */}
         <div className="admin-nav-modal__actions">
-          <button onClick={onCancel} className="admin-nav-btn--secondary">
+          <button type="button" onClick={onCancel} className="admin-nav-btn--secondary">
             {t('plugin-admin-nav:cancel')}
           </button>
-          <button onClick={handleSave} className="admin-nav-btn--primary">
+          <button type="button" onClick={handleSave} className="admin-nav-btn--primary">
             {t('plugin-admin-nav:save')}
           </button>
         </div>

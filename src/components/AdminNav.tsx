@@ -7,6 +7,7 @@ import { useAuth } from '@payloadcms/ui'
 import { cacheOwnerKey, useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import { StyleInjector } from './StyleInjector.js'
+import { ErrorBoundary } from './ErrorBoundary.js'
 import { NavUserProfile } from './NavUserProfile.js'
 import NavFooterSlot from './NavFooterSlot.js'
 import { getIconPath } from '../icons.js'
@@ -154,7 +155,7 @@ interface DefaultNavMeta {
  * - User profile + availability popover above the footer
  * - Optional consumer-provided footer slot replacing the Customize link
  */
-const AdminNav: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
+const AdminNavInner: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
   const { t, i18n } = usePluginTranslation()
   // The nav cache outlives a logout (sessionStorage lives as long as the tab,
   // the module cache as long as the JS context): it is scoped to the viewer so
@@ -625,4 +626,28 @@ const AdminNav: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PAT
   )
 }
 
+/**
+ * The exported sidebar: `AdminNavInner` behind a render boundary.
+ *
+ * This component is injected into `beforeNavLinks`, so it renders on *every*
+ * page of the admin panel and Payload mounts it straight from the import map —
+ * the plugin never sees its parent and cannot be given an ancestor boundary.
+ * Without this wrapper, one throw anywhere in the sidebar (an icon name the
+ * registry does not know, a stored layout shaped in a way the sanitizer did not
+ * anticipate, a Payload provider that moved) took the whole panel down, with
+ * the "Customize" link needed to repair it sitting inside the tree that just
+ * died.
+ *
+ * `fallback={null}` is the point of the whole thing: on failure the plugin's
+ * sidebar disappears and Payload's own navigation, rendered by the host next to
+ * this slot, keeps working. A visible error panel here would be a permanent red
+ * block on every page and would not help anybody who is not the integrator.
+ */
+const AdminNav: React.FC<{ basePath?: string }> = (props) => (
+  <ErrorBoundary componentName="AdminNav" fallback={null}>
+    <AdminNavInner {...props} />
+  </ErrorBoundary>
+)
+
+export { AdminNavInner }
 export default AdminNav

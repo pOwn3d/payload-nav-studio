@@ -21,11 +21,17 @@ const IconButton: React.FC<{
 
   return (
     <button
+      type="button"
       onClick={onClick}
       title={name}
+      // `title` is only a last-resort accessible name and several screen
+      // readers ignore it: the button's whole content is a decorative <svg>,
+      // so without this the control announces as "button", unnamed.
+      aria-label={name}
+      aria-pressed={isSelected}
       className={`admin-nav-icon-picker__icon-btn${isSelected ? ' admin-nav-icon-picker__icon-btn--selected' : ''}`}
     >
-      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden="true" focusable="false" width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         {paths.map((d, i) => <path key={i} d={d} />)}
       </svg>
     </button>
@@ -62,6 +68,9 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
         <input
           type="text"
           placeholder={t('plugin-admin-nav:searchIcon')}
+          // No sibling <label> exists here, and the placeholder disappears as
+          // soon as the field has content: name the control explicitly.
+          aria-label={t('plugin-admin-nav:searchIcon')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
@@ -101,7 +110,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange, onClose
 
       {/* Close */}
       <div className="admin-nav-icon-picker__footer">
-        <button onClick={onClose} className="admin-nav-icon-picker__close-btn">
+        <button type="button" onClick={onClose} className="admin-nav-icon-picker__close-btn">
           {t('plugin-admin-nav:close')}
         </button>
       </div>

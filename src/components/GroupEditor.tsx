@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useId, useState } from 'react'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import type { NavGroupConfig, LocalizedString } from '../types.js'
 import { isMultiLang, resolveLabel } from '../utils.js'
@@ -74,17 +74,60 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
   const i18nLanguages = (i18n as unknown as { languages?: string[] }).languages
   const availableLangs = i18nLanguages?.filter((l) => l !== 'cimode') || [i18n.language]
 
+  // `useId()` rather than literal ids: two editors can be mounted at once and
+  // duplicated ids break the `htmlFor` association they exist to create.
+  const fieldId = useId()
+  const titleFieldId = `${fieldId}-title`
+  const idFieldId = `${fieldId}-id`
+  const headingId = `${fieldId}-heading`
+
+  // Keyboard parity with the click-outside dismissal below.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
-    <div className="admin-nav-modal-overlay" onClick={onCancel}>
-      <div className="admin-nav-modal admin-nav-modal--sm" onClick={(e) => e.stopPropagation()}>
-        <h3 className="admin-nav-modal__title">
+    // The backdrop closes on its own clicks only; the inner container no longer
+    // carries an `onClick` whose sole purpose was `stopPropagation`, which made
+    // a plain container read as a control.
+    <div
+      className="admin-nav-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel()
+      }}
+    >
+      {/* `role="dialog"` + `aria-labelledby` announce the container and name it.
+          `aria-modal` is deliberately NOT claimed: nothing confines Tab to this
+          subtree yet, and telling assistive technology the rest of the page is
+          inert while it is still reachable by keyboard is worse than saying
+          nothing. Escape closes it, which is the parity the backdrop click
+          was missing. */}
+      <div
+        className="admin-nav-modal admin-nav-modal--sm"
+        role="dialog"
+        aria-labelledby={headingId}
+      >
+        <h3 className="admin-nav-modal__title" id={headingId}>
           {isNew ? t('plugin-admin-nav:newGroup') : t('plugin-admin-nav:editGroup')}
         </h3>
 
         {/* Title */}
         <div className="admin-nav-modal__field-group">
           <div className="admin-nav-modal__field-row">
-            <label className="admin-nav-modal__label admin-nav-modal__label--inline">{t('plugin-admin-nav:titleField')}</label>
+            {/* In multi-language mode the single input is replaced by one per
+                language, so the shared label points at the first of them rather
+                than at an id nothing renders. */}
+            <label
+              className="admin-nav-modal__label admin-nav-modal__label--inline"
+              htmlFor={useMultiLang ? `${titleFieldId}-${availableLangs[0]}` : titleFieldId}
+            >
+              {t('plugin-admin-nav:titleField')}
+            </label>
             <label className="admin-nav-modal__multilang-toggle">
               <input
                 type="checkbox"
@@ -106,9 +149,13 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
             <div className="admin-nav-modal__multilang-fields">
               {availableLangs.map((lang) => (
                 <div key={lang} className="admin-nav-modal__lang-row">
-                  <span className="admin-nav-modal__lang-code">{lang}</span>
+                  {/* The language code is the only per-input name available, so
+                      it is a real <label> rather than a decorative <span>. */}
+                  <label className="admin-nav-modal__lang-code" htmlFor={`${titleFieldId}-${lang}`}>{lang}</label>
                   <input
                     type="text"
+                    id={`${titleFieldId}-${lang}`}
+                    aria-label={`${t('plugin-admin-nav:titleField')} (${lang})`}
                     value={titleRecord[lang] || ''}
                     onChange={(e) => {
                       setTitleRecord((prev) => ({ ...prev, [lang]: e.target.value }))
@@ -126,6 +173,7 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
           ) : (
             <input
               type="text"
+              id={titleFieldId}
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value)
@@ -140,9 +188,10 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
 
         {/* ID */}
         <div className="admin-nav-modal__field-group">
-          <label className="admin-nav-modal__label">{t('plugin-admin-nav:idField')}</label>
+          <label className="admin-nav-modal__label" htmlFor={idFieldId}>{t('plugin-admin-nav:idField')}</label>
           <input
             type="text"
+            id={idFieldId}
             value={id}
             onChange={(e) => setId(e.target.value)}
             placeholder={t('plugin-admin-nav:idPlaceholder')}
@@ -165,10 +214,11 @@ export const GroupEditor: React.FC<GroupEditorProps> = ({ group, onSave, onCance
 
         {/* Actions */}
         <div className="admin-nav-modal__actions">
-          <button onClick={onCancel} className="admin-nav-btn--secondary">
+          <button type="button" onClick={onCancel} className="admin-nav-btn--secondary">
             {t('plugin-admin-nav:cancel')}
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={!resolvedTitle.trim()}
             className="admin-nav-btn--primary"

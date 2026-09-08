@@ -447,6 +447,17 @@ const ADMIN_NAV_CSS = `/* ======================================================
   color: var(--nav-muted);
 }
 
+/* The input above clears its own outline, and the only remaining cue was the
+   wrapper's :focus-within ring — a 1px border plus a 1px shadow at 30 % of the
+   accent, which does not reach the 3:1 contrast WCAG 2.2 SC 2.4.11 asks of a
+   focus indicator. This draws a solid one on the field itself, keyboard-only
+   (:focus-visible) so a mouse click does not paint a ring. */
+.admin-nav__jumpto-input:focus-visible {
+  outline: 2px solid var(--nav-accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 /* Remove the native "X" button from search inputs in WebKit to keep our own UI */
 .admin-nav__jumpto-input::-webkit-search-cancel-button {
   -webkit-appearance: none;

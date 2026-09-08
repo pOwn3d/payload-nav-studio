@@ -39,6 +39,7 @@ const sharedConfig: Partial<Options> = {
 /** Client files produced by pass 2 (non-dnd components + hooks). */
 const NON_DND_CLIENT_FILES = [
   'dist/components/AdminNav.js',
+  'dist/components/ErrorBoundary.js',
   'dist/components/GroupEditor.js',
   'dist/components/NavItemEditor.js',
   'dist/components/IconPicker.js',
@@ -107,6 +108,10 @@ export default defineConfig([
     entry: [
       'src/client.ts',
       'src/components/AdminNav.tsx',
+      // Wraps AdminNav in the client entry and the RSC view alike; both passes are
+      // `bundle: false`, so it has to be an entry of its own or their emitted
+      // relative import points at a file that was never written.
+      'src/components/ErrorBoundary.tsx',
       'src/components/GroupEditor.tsx',
       'src/components/NavItemEditor.tsx',
       'src/components/IconPicker.tsx',

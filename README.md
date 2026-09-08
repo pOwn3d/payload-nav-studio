@@ -44,6 +44,8 @@ entry the current user has no read access to, so the sidebar never enumerates wh
 - [Components and Hooks](#components-and-hooks)
 - [Package Exports](#package-exports)
 - [Requirements](#requirements)
+- [Database and updates](#database-and-updates)
+- [Upgrading](#upgrading)
 - [Migration from `@consilioweb/admin-nav`](#migration-from-consiliowebadmin-nav)
 - [Uninstall](#uninstall)
 - [Support](#support)
@@ -707,7 +709,7 @@ by `NavItemEditor`.
 
 | Export | Description |
 |--------|-------------|
-| `AdminNav` | The sidebar itself, injected through `beforeNavLinks` |
+| `AdminNav` | The sidebar itself, injected through `beforeNavLinks`, behind a render boundary (see below) |
 | `GroupEditor` | Modal for editing group properties (with multi-lang toggle) |
 | `NavItemEditor` | Modal for editing an item, its sub-items and its multi-lang labels |
 | `IconPicker` | Icon dropdown with search and color mode |
@@ -720,11 +722,24 @@ by `NavItemEditor`.
 `/client`: they pull in `@dnd-kit`, whose `createContext` crashes when Turbopack evaluates the barrel
 in an SSR context. They are reached only through the `views` entry.
 
+#### Render boundary
+
+`AdminNav` renders on **every** page of the admin panel, and Payload mounts it straight from the
+import map — so the plugin cannot be given an ancestor error boundary and carries its own instead.
+A render error inside the sidebar therefore removes the plugin's sidebar and leaves Payload's own
+navigation working, rather than taking the page down; the error is logged to the console with the
+component name. `/admin/nav-customizer` is wrapped the same way, with a visible notice instead,
+since that page has nothing else to show.
+
+This covers **render** errors only, which is all a React boundary ever catches. The sidebar's own
+network calls (`/preferences`, `/default-nav`, `/badges`) are guarded at the call site, where a
+rejected promise actually lands.
+
 ### Server views (`/views`)
 
 | Export | Path | Description |
 |--------|------|-------------|
-| `NavCustomizerView` | `/admin/nav-customizer` | Admin view wrapping the customizer in Payload's `DefaultTemplate` |
+| `NavCustomizerView` | `/admin/nav-customizer` | Admin view wrapping the customizer in Payload's `DefaultTemplate`, behind a render boundary |
 
 ### `useNavPreferences`
 
@@ -875,6 +890,78 @@ import { NavCustomizerView } from '@consilioweb/payload-admin-nav/views'
 
 React 18, Next 14, Next 15.0–15.4.10 and Payload below `3.79.1` are no longer supported:
 installing on them raises an `ERESOLVE` / peer warning.
+
+## Database and updates
+
+This plugin **adds a collection to your Payload config; it does not own your schema**. Payload has no
+way for a plugin to ship migrations — `payload migrate` reads a single directory, the host app's
+`payload.db.migrationDir` — so generating and running the DDL is your app's job, exactly as it is for
+your own collections.
+
+- **In development**, `push` syncs the schema automatically; nothing else to do.
+- **In production**, run `payload migrate:create` then `payload migrate` — never `push`. It is skipped
+  as soon as `NODE_ENV=production`, and mixing a pushed schema with migrations makes Drizzle warn
+  about data loss.
+- **Every release** states in its *Upgrading* section whether it changes the schema. To date none has.
+
+## Upgrading
+
+**No schema change.** No migration to generate for any release of this plugin so far: the
+`admin-nav-preferences` collection has had the same four fields — `user`, `navLayout`,
+`collapsedGroups`, `version` — since `0.12.1`. Everything below is behaviour, access rules and data.
+
+### 0.17.x → 0.18.0
+
+- `peerDependencies` now require Payload `^3.79.1` (was `^3.0.0`) for `payload`, `@payloadcms/next`,
+  `@payloadcms/ui` and the optional `@payloadcms/translations`. Upgrade the host; check what it
+  actually resolves with `pnpm why payload`, not what the manifest asks for.
+- `/admin/nav-customizer` now applies the same gate as the endpoints. Accounts on a second auth
+  collection, and admin-collection members whom `access.admin` refuses, are redirected to the host's
+  unauthorized view. Nothing to repair in the database: what leaked was read access, and the
+  customizer's writes have gone through `PATCH /preferences` since `0.16.0`.
+- `NavCustomizerView` is now an `async` server component. A wrapper that re-exported it typed as
+  `React.FC<AdminViewServerProps>` no longer typechecks.
+
+### 0.16.x → 0.17.0
+
+This is the release with data to audit. Two write paths were open before it, and **the fix closes
+them without cleaning up what went through**:
+
+- The preferences collection was reachable on its auto-generated REST route by any authenticated
+  account, on any auth collection, and its `user` field was writable from the request. A row could
+  therefore be created on somebody else's behalf — and, `user` being `unique`, squat the index so
+  that person could never save their own preferences again.
+- `navLayout` and `collapsedGroups` were stored unvalidated on that same route. The rules now run as
+  field `validate` too, but only on the value a request actually *sets*: an untouched legacy value is
+  left alone and neutralised at render time by the read-side sanitizer. So a stored row can render as
+  something other than what it holds, or not render at all, with no signal anywhere.
+
+Run the audit below once after upgrading.
+
+### Auditing existing preference rows
+
+```bash
+# From the root of your Payload app. Reports only, writes nothing.
+npx admin-nav-audit-preferences
+
+# Same run, applying the repairs it listed
+npx admin-nav-audit-preferences --fix
+```
+
+| Reported | What it means | What `--fix` does |
+|---|---|---|
+| `foreign-owner` | The row's `user` points at no document in your admin auth collection | Deletes the row |
+| `no-owner` | The row has no `user` at all | Deletes the row |
+| `duplicate-owner` | Several rows claim the same owner — the `unique` index is not enforced here | **Nothing.** Deleting the wrong twin destroys a real layout; decide by hand |
+| `layout-rejected` | Nothing in `navLayout.groups` survives the read-side check: that user silently gets the default nav | Clears `navLayout` |
+| `layout-filtered` | What the row stores is not what renders — entries or keys are dropped on the way out | Rewrites `navLayout.groups` to what already renders |
+| `layout-invalid` | The stored layout is one the current validator refuses, so its owner can no longer save a change to that field | Rewrites it to the sanitized equivalent, or clears it when nothing usable is left |
+| `collapsed-invalid` | `collapsedGroups` holds non-strings or is over the cap | Keeps the valid entries |
+
+It runs through the host's own `payload` CLI, so it picks up your `.env` and your
+`payload.config.ts`. Pass `--collection=<slug>` if you renamed `preferencesSlug`, and
+`PAYLOAD_CONFIG_PATH` if your config is not where Payload's resolver looks. `npx
+admin-nav-audit-preferences --help` lists everything.
 
 ## Migration from `@consilioweb/admin-nav`
 

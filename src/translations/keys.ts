@@ -79,3 +79,6 @@ export type PluginAdminNavTranslationKeys =
   | 'plugin-admin-nav:busy'
   | 'plugin-admin-nav:away'
   | 'plugin-admin-nav:offline'
+  // Render-error boundary
+  | 'plugin-admin-nav:viewCrashed'
+  | 'plugin-admin-nav:retry'

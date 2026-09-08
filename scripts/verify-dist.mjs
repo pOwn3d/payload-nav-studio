@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from 'node:fs'
 /** Files that MUST start with the "use client" directive. */
 const MUST_HAVE_DIRECTIVE = [
   'dist/components/AdminNav.js',
+  'dist/components/ErrorBoundary.js',
   'dist/components/GroupEditor.js',
   'dist/components/NavItemEditor.js',
   'dist/components/IconPicker.js',

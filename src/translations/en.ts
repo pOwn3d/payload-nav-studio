@@ -114,5 +114,9 @@ export const en = {
     busy: 'Busy',
     away: 'Away',
     offline: 'Offline',
+
+    // Render-error boundary
+    viewCrashed: 'This view could not be displayed',
+    retry: 'Try again',
   },
 }

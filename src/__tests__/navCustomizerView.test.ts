@@ -25,6 +25,7 @@ vi.mock('../views/NavCustomizerViewClient.js', () => ({
 }))
 
 const { NavCustomizerView } = await import('../views/NavCustomizerView.js')
+const { ErrorBoundary } = await import('../components/ErrorBoundary.js')
 
 type Actor = { id: string; collection: string; role?: string } | null
 
@@ -178,9 +179,69 @@ describe('NavCustomizerView — accès à la vue /admin/nav-customizer', () => {
     const props = makeProps({ user: { id: 'u1', collection: 'users' }, adminUserSlug: 'users' })
 
     const element = (await NavCustomizerView(props)) as React.ReactElement<{
-      children: React.ReactElement<{ basePath: string }>
+      children: React.ReactElement<{ children: React.ReactElement<{ basePath: string }> }>
     }>
 
-    expect(element.props.children.props.basePath).toBe('/api/admin-nav')
+    // DefaultTemplate > ErrorBoundary > NavCustomizerViewClient
+    expect(element.props.children.props.children.props.basePath).toBe('/api/admin-nav')
+  })
+})
+
+describe('NavCustomizerView — frontière de rendu', () => {
+  /**
+   * La vue est un composant serveur monté par Payload depuis l'import map : le
+   * plugin ne contrôle pas son parent, donc la frontière doit être posée ici,
+   * dans le module exporté. Contrairement à `AdminNav` (rayon global, dégradation
+   * silencieuse), le fallback est VISIBLE : la page n'a plus rien d'autre à
+   * montrer, et un écran vide ne dit pas à l'intégrateur d'aller voir la console.
+   */
+  it("enveloppe le client dans une ErrorBoundary au fallback visible", async () => {
+    const props = makeProps({ user: { id: 'u1', collection: 'users' }, adminUserSlug: 'users' })
+
+    const element = (await NavCustomizerView(props)) as React.ReactElement<{
+      children: React.ReactElement<{
+        componentName?: string
+        fallback?: unknown
+        retryLabel?: string
+        title?: string
+      }>
+    }>
+
+    const boundary = element.props.children
+    expect(boundary.type).toBe(ErrorBoundary)
+    // `undefined`, pas `null` : c'est ce qui déclenche l'encart intégré.
+    expect(boundary.props.fallback).toBeUndefined()
+    expect(boundary.props.componentName).toBe('NavCustomizer')
+  })
+
+  it("retombe sur l'anglais quand l'hôte n'a pas fusionné les traductions", async () => {
+    // `req.i18n` du double est `{}` : `t` n'existe pas. Une vue qui appellerait
+    // `req.i18n.t(...)` sans garde planterait ici — exactement sur l'écran censé
+    // gérer les plantages.
+    const props = makeProps({ user: { id: 'u1', collection: 'users' }, adminUserSlug: 'users' })
+
+    const element = (await NavCustomizerView(props)) as React.ReactElement<{
+      children: React.ReactElement<{ retryLabel?: string; title?: string }>
+    }>
+
+    expect(element.props.children.props.title).toBe('Something went wrong')
+    expect(element.props.children.props.retryLabel).toBe('Try again')
+  })
+
+  it("utilise la traduction de l'hôte quand elle est disponible", async () => {
+    const props = makeProps({ user: { id: 'u1', collection: 'users' }, adminUserSlug: 'users' })
+    ;(props.initPageResult.req as unknown as { i18n: unknown }).i18n = {
+      t: (key: string) =>
+        key === 'plugin-admin-nav:viewCrashed' ? "Cette vue n'a pas pu s'afficher" : key,
+    }
+
+    const element = (await NavCustomizerView(props)) as React.ReactElement<{
+      children: React.ReactElement<{ retryLabel?: string; title?: string }>
+    }>
+
+    expect(element.props.children.props.title).toBe("Cette vue n'a pas pu s'afficher")
+    // `t` a renvoyé la clé telle quelle : c'est une absence de traduction, pas
+    // une traduction. On retombe sur l'anglais plutôt que d'afficher la clé.
+    expect(element.props.children.props.retryLabel).toBe('Try again')
   })
 })

@@ -9,6 +9,7 @@ import { formatAdminURL } from 'payload/shared'
 import React from 'react'
 import { redirect } from 'next/navigation'
 import { NavCustomizerViewClient } from './NavCustomizerViewClient.js'
+import { ErrorBoundary } from '../components/ErrorBoundary.js'
 import { DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { hasAdminAccess } from '../utils/requireAdmin.js'
 
@@ -20,6 +21,30 @@ import { hasAdminAccess } from '../utils/requireAdmin.js'
 function adminURL(config: SanitizedConfig | undefined, path: `/${string}`): string {
   const adminRoute = config?.routes?.admin ?? '/admin'
   return formatAdminURL({ adminRoute, path })
+}
+
+/**
+ * Resolve one of this plugin's own i18n keys through the host's `req.i18n`.
+ *
+ * The plugin merges its namespace into `config.i18n.translations`, so the key
+ * resolves at runtime — but Payload types `t` against the *host's* declared
+ * translation keys, which never include a plugin namespace. The cast is that
+ * gap, and the fallback covers a host that replaced `i18n.translations`
+ * wholesale rather than letting the merge happen.
+ */
+function translate(
+  i18n: { t?: unknown } | undefined,
+  key: string,
+  fallback: string,
+): string {
+  const t = i18n?.t
+  if (typeof t !== 'function') return fallback
+  try {
+    const value = (t as (k: string) => unknown)(key)
+    return typeof value === 'string' && value.length > 0 && value !== key ? value : fallback
+  } catch {
+    return fallback
+  }
 }
 
 /**
@@ -74,7 +99,13 @@ export const NavCustomizerView = async (
       user={req.user}
       visibleEntities={visibleEntities}
     >
-      <NavCustomizerViewClient basePath={resolvedBasePath} />
+      <ErrorBoundary
+        componentName="NavCustomizer"
+        title={translate(req.i18n, 'plugin-admin-nav:viewCrashed', 'Something went wrong')}
+        retryLabel={translate(req.i18n, 'plugin-admin-nav:retry', 'Try again')}
+      >
+        <NavCustomizerViewClient basePath={resolvedBasePath} />
+      </ErrorBoundary>
     </DefaultTemplate>
   )
 }
