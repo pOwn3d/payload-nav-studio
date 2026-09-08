@@ -110,6 +110,11 @@ Powered by [@dnd-kit](https://dndkit.com/), bundled into the package:
   left untouched
 - All six endpoints are restricted to admin-panel users: the caller must belong to
   `config.admin.user` and pass that collection's `access.admin` when one is declared
+- The preferences collection applies the same rule on its own REST route: every operation requires
+  the caller to belong to `userCollectionSlug`, so an account authenticated against another auth
+  collection (customers, members) is refused even when its numeric id matches an administrator's
+- When permission computation fails (a host access function that throws), every entry pointing at a
+  registered collection or global is hidden instead of shown, and the failure is logged
 
 ### Auto-Discovery (Zero-Config)
 
@@ -680,7 +685,7 @@ by `NavItemEditor`.
 
 | Slug | Role | Access |
 |------|------|--------|
-| `admin-nav-preferences` (configurable) | One row per user: `user`, `navLayout` (JSON), `collapsedGroups` (JSON), `version` | `read` / `update` / `delete` restricted to the row whose `user` is the requester; `create` requires an authenticated user. Hidden from the admin UI (`admin.hidden: true`) |
+| `admin-nav-preferences` (configurable) | One row per user: `user`, `navLayout` (JSON), `collapsedGroups` (JSON), `version` | Every operation requires the caller to belong to `userCollectionSlug`; `read` / `update` / `delete` are then restricted to the row whose `user` is the requester. `user` is set server-side and is not writable from a request. `navLayout` and `collapsedGroups` are validated on write with the same rules as the PATCH endpoint. Hidden from the admin UI (`admin.hidden: true`) |
 
 ## Components and Hooks
 
@@ -741,10 +746,23 @@ function MyComponent() {
 
 `save()` and `reset()` return a boolean: check it before showing a success state.
 
-The hook takes one optional argument — `useNavPreferences(basePath = '/api/admin-nav')` — the
-`/api`-prefixed base of the plugin endpoints. Pass it only if you changed `endpointBasePath`, which
-also requires replacing the bundled nav component (see
-[`AdminNavPluginConfig`](#adminnavpluginconfig)).
+The hook takes two optional arguments — `useNavPreferences(basePath = '/api/admin-nav', ownerKey = null)`.
+
+- `basePath` — the `/api`-prefixed base of the plugin endpoints. Pass it only if you changed
+  `endpointBasePath`, which also requires replacing the bundled nav component (see
+  [`AdminNavPluginConfig`](#adminnavpluginconfig)).
+- `ownerKey` — the viewer the cache belongs to. Build it with `cacheOwnerKey(user)` from
+  `useAuth()`; the bundled components already do. Left out, the hook caches nothing and fetches on
+  every mount, because an unowned cache entry could not be refused to the next account signing in
+  from the same tab.
+
+```tsx
+import { useAuth } from '@payloadcms/ui'
+import { cacheOwnerKey, useNavPreferences } from '@consilioweb/payload-admin-nav/client'
+
+const { user } = useAuth()
+const { layout } = useNavPreferences('/api/admin-nav', cacheOwnerKey(user))
+```
 
 ### Caching Strategy
 
@@ -758,6 +776,15 @@ The hook uses a two-tier cache for instant rendering with no flash:
 On the server the module variables are always `null`, matching the client's initial state. After the
 first successful fetch both caches are populated, and a fetch is skipped entirely while the cache is
 younger than 60 seconds.
+
+Both tiers are stamped with the viewer they were filled for (`ownerKey`) and are neither read nor
+reused by anybody else. Neither tier is scoped to a Payload session — `sessionStorage` lives as long
+as the tab, the module variables as long as the JS context, and logging out then back in is a
+same-tab client-side navigation — so without that stamp the next account would inherit the previous
+one's sidebar and its permission-filtered `defaultNav`, with the 60-second freshness window
+preventing any fetch from correcting it. What comes out of the cache is also re-checked with the
+same rules the fetch applies, so a layout stored before those rules existed is not rendered from
+cache either.
 
 ## Package Exports
 

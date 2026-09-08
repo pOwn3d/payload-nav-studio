@@ -281,17 +281,49 @@ describe('GET /default-nav — ce que l\'utilisateur a le droit de voir dans la 
     ])
   })
 
-  it('rend la nav complète quand le calcul des permissions échoue, pour ne pas vider l\'admin', async () => {
-    // Fail-open assumé : un admin sans sidebar n'a plus aucun moyen de revenir.
+  it('masque collections et globals quand le calcul des permissions échoue, et le trace', async () => {
+    // Anciennement fail-open : une SEULE fonction d'accès de l'hôte qui lève
+    // (un `throw`, ou un `user.roles.includes(...)` sur un `roles` undefined)
+    // fait rejeter le `Promise.all` de getAccessResults et rendait la carte
+    // complète du panel — silencieusement, le catch étant vide.
     mockedAccess.mockRejectedValue(new Error('permissions unavailable'))
 
+    const warnings: string[] = []
+    const req = makeReq({ collections: ['secrets'], globals: ['settings'] })
+    ;(req.payload as unknown as { logger: { warn: (m: string) => void } }).logger.warn = (m) =>
+      warnings.push(m)
+
     const { status, body } = await defaultNavOf(
+      [
+        {
+          id: 'g',
+          title: 'G',
+          items: [
+            item('secrets', '/admin/collections/secrets'),
+            item('settings', '/admin/globals/settings'),
+            item('seo', '/admin/seo-dashboard'),
+          ],
+        },
+      ],
+      req,
+    )
+
+    expect(status).toBe(200)
+    // Les entités identifiables disparaissent ; les vues custom, que le
+    // filtrage ne couvre de toute façon pas, restent atteignables.
+    expect(body.defaultNav[0].items.map((i: any) => i.id)).toEqual(['seo'])
+    expect(warnings.join('\n')).toContain('Permission computation failed')
+  })
+
+  it('vide entièrement la nav quand elle ne contient que des entités et que les permissions échouent', async () => {
+    mockedAccess.mockRejectedValue(new Error('permissions unavailable'))
+
+    const { body } = await defaultNavOf(
       [{ id: 'g', title: 'G', items: [item('secrets', '/admin/collections/secrets')] }],
       makeReq({ collections: ['secrets'] }),
     )
 
-    expect(status).toBe(200)
-    expect(body.defaultNav[0].items.map((i: any) => i.id)).toEqual(['secrets'])
+    expect(body.defaultNav).toEqual([])
   })
 
   it('ne fait PAS de fail-open quand les permissions se calculent et refusent tout', async () => {
@@ -430,5 +462,108 @@ describe('endpointBasePath — le client suit reellement le prefixe configure', 
     const paths = (built.endpoints ?? []).map((e) => e.path)
     expect(paths).toContain('/custom-nav/default-nav')
     expect(paths.every((p) => !p.startsWith('/admin-nav/'))).toBe(true)
+  })
+})
+
+describe('GET /badges — les compteurs suivent les mêmes permissions que la nav', () => {
+  /** Nav de support : un badge de groupe, un badge d'enfant, tous deux sur `tickets`. */
+  const supportNav = (
+    groupBadge: () => Promise<number>,
+    childBadge: () => Promise<number>,
+  ): NavGroupConfig[] => [
+    {
+      id: 'support',
+      title: 'Support',
+      groupBadge,
+      items: [
+        item('tickets', '/admin/collections/tickets', {
+          children: [
+            item('tickets-urgent', '/admin/collections/tickets?priority=high', { childBadge }),
+          ],
+        }),
+      ],
+    } as unknown as NavGroupConfig,
+  ]
+
+  async function badgesOf(
+    nav: NavGroupConfig[],
+    req: PayloadRequest,
+  ): Promise<{ status: number; body: any }> {
+    const res = await endpointOf('/admin-nav/badges', { defaultNav: nav })(req)
+    return { status: res.status, body: await res.json() }
+  }
+
+  it('ne rend ni l\'id ni le compteur d\'une entrée que /default-nav cache à cet utilisateur', async () => {
+    // Le membre du staff passe `requireAdmin` mais n'a pas le droit `read` sur
+    // `tickets`. L'endpoint itérait sur le defaultNav entier et exécutait les
+    // résolveurs via la Local API (overrideAccess) : il rendait à la fois
+    // l'existence des sections masquées et leurs métriques métier.
+    mockedAccess.mockResolvedValue({ collections: {} } as never)
+    const groupBadge = vi.fn(async () => 37)
+    const childBadge = vi.fn(async () => 4)
+
+    const { status, body } = await badgesOf(
+      supportNav(groupBadge, childBadge),
+      makeReq({ collections: ['tickets'] }),
+    )
+
+    expect(status).toBe(200)
+    expect(body).toEqual({ groups: {}, children: {} })
+    // Pas seulement filtré à la sortie : la requête métier n'est jamais lancée.
+    expect(groupBadge).not.toHaveBeenCalled()
+    expect(childBadge).not.toHaveBeenCalled()
+  })
+
+  it('rend les compteurs des entrées que l\'utilisateur a le droit de lire', async () => {
+    mockedAccess.mockResolvedValue({ collections: { tickets: { read: true } } } as never)
+    const groupBadge = vi.fn(async () => 37)
+    const childBadge = vi.fn(async () => 4)
+
+    const { body } = await badgesOf(
+      supportNav(groupBadge, childBadge),
+      makeReq({ collections: ['tickets'] }),
+    )
+
+    expect(body).toEqual({ groups: { support: 37 }, children: { 'tickets-urgent': 4 } })
+  })
+
+  it('coupe le badge d\'un enfant interdit sans toucher au badge du groupe qui reste visible', async () => {
+    mockedAccess.mockResolvedValue({ collections: { tickets: { read: true } } } as never)
+    const groupBadge = vi.fn(async () => 12)
+    const allowedChild = vi.fn(async () => 3)
+    const deniedChild = vi.fn(async () => 99)
+
+    const { body } = await badgesOf(
+      [
+        {
+          id: 'support',
+          title: 'Support',
+          groupBadge,
+          items: [
+            item('tickets', '/admin/collections/tickets', {
+              children: [
+                item('open', '/admin/collections/tickets?status=open', { childBadge: allowedChild }),
+                item('invoices', '/admin/collections/invoices', { childBadge: deniedChild }),
+              ],
+            }),
+          ],
+        } as unknown as NavGroupConfig,
+      ],
+      makeReq({ collections: ['tickets', 'invoices'] }),
+    )
+
+    expect(body).toEqual({ groups: { support: 12 }, children: { open: 3 } })
+    expect(deniedChild).not.toHaveBeenCalled()
+  })
+
+  it('refuse la requête anonyme avant tout calcul de permission', async () => {
+    const groupBadge = vi.fn(async () => 1)
+
+    const res = await endpointOf('/admin-nav/badges', {
+      defaultNav: supportNav(groupBadge, async () => 0),
+    })(makeReq({ anonymous: true }))
+
+    expect(res.status).toBe(401)
+    expect(groupBadge).not.toHaveBeenCalled()
   })
 })

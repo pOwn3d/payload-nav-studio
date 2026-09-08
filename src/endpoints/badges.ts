@@ -1,6 +1,7 @@
 import type { PayloadHandler } from 'payload'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 import { requireAdmin } from '../utils/requireAdmin.js'
+import { filterNavByPermissions } from '../utils/navPermissions.js'
 import type { NavGroupConfig, NavChildConfig } from '../types.js'
 
 /** Extract user ID from request (works with object or primitive) */
@@ -20,6 +21,17 @@ function getUserId(req: { user?: unknown }): string | number {
  * `null` so a single buggy counter doesn't break the whole nav. Negative
  * or non-integer values are clamped to zero. Total time is bounded by the
  * slowest resolver — keep your queries fast (1 SQL count per resolver max).
+ *
+ * The nav is filtered by permissions first, with the same primitive
+ * `/default-nav` and `/discover` use. Being admin-panel staff is not being
+ * allowed to read every collection: without that filtering this endpoint
+ * answered from the whole `defaultNav` and returned both the ids of the entries
+ * `/default-nav` hides from that user and the counter behind each of them —
+ * open tickets, pending orders — since resolvers query through the Local API
+ * with `overrideAccess: true`. One `getAccessResults` per poll is the price of
+ * the two endpoints agreeing; memoizing it per user would trade a confirmed
+ * leak for a cache keyed on an authenticated identity, which is how stale
+ * permissions get served after a role change.
  */
 export function createBadgesHandler(defaultNav: NavGroupConfig[]): PayloadHandler {
   return async (req) => {
@@ -42,7 +54,10 @@ export function createBadgesHandler(defaultNav: NavGroupConfig[]): PayloadHandle
 
     const tasks: Task[] = []
 
-    for (const group of defaultNav) {
+    // Same source of truth as `/default-nav`: resolve only what this user may see.
+    const visibleNav = await filterNavByPermissions(defaultNav, req)
+
+    for (const group of visibleNav) {
       if (typeof group.groupBadge === 'function') {
         tasks.push({ kind: 'group', id: group.id, fn: group.groupBadge })
       }

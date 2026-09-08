@@ -118,6 +118,11 @@ export default defineConfig([
       'src/hooks/usePluginTranslation.ts',
       'src/icons.ts',
       'src/utils.ts',
+      // Imported by useNavPreferences to re-check the stored layout before it is
+      // rendered. This pass is `bundle: false`, so every module the client
+      // entries import has to be an entry itself or the emitted relative import
+      // points at a file that was never written.
+      'src/utils/navLayoutValidation.ts',
       'src/types.ts',
       'src/translations/keys.ts',
       'src/translations/en.ts',

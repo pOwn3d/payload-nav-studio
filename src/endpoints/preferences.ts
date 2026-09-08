@@ -1,135 +1,101 @@
-import type { PayloadHandler } from 'payload'
+import type { PayloadHandler, PayloadRequest } from 'payload'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 import { requireAdmin } from '../utils/requireAdmin.js'
-import { isSafeHref } from '../utils.js'
+import {
+  MAX_BODY_BYTES,
+  validateCollapsedGroups,
+  validateNavLayout,
+} from '../utils/navLayoutValidation.js'
 
 /**
- * Hard ceiling on the PATCH body.
+ * Read the JSON body without ever buffering more than `MAX_BODY_BYTES`.
  *
- * `req.json()` buffers the whole body in memory: Payload only caps multipart
- * uploads and Next caps nothing on route handlers, so an unbounded body blows
- * the heap and takes the CMS down — and a 30 req/min limit does not help when
- * one request is enough.
+ * The `Content-Length` pre-check alone was bypassable: a `Transfer-Encoding:
+ * chunked` request carries no such header, `Number(null)` is `NaN`, the guard
+ * fell through and `req.json()` buffered the whole stream. Next puts no limit on
+ * App Router route handlers and Payload only caps multipart uploads, so a single
+ * request was enough to exhaust the heap. The nested caps below do not help:
+ * they run *after* the parse.
  *
- * Enforced from `Content-Length`, which every JSON client sets. A chunked body
- * without that header cannot be pre-checked here; the nested caps below still
- * bound what can be persisted.
+ * The stream is therefore consumed with a running byte counter and abandoned as
+ * soon as it goes over. Payload does not pre-read the body of a custom endpoint
+ * (`addDataAndFileToRequest` only runs on collection/global routes), so
+ * `req.body` is still readable here; the `req.json()` path stays as a fallback
+ * for any runtime that exposes no readable stream.
  */
-const MAX_BODY_BYTES = 256 * 1024
-const MAX_GROUPS = 50
-const MAX_ITEMS_PER_GROUP = 100
-const MAX_CHILDREN = 50
-const MAX_ID_LENGTH = 100
-const MAX_LABEL_LENGTH = 200
-const MAX_ICON_LENGTH = 50
-/** Items → children. Deeper nesting is not part of the nav model. */
-const MAX_ENTRY_DEPTH = 2
+async function readBoundedJsonBody(
+  req: PayloadRequest,
+): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; response: Response }> {
+  const tooLarge = () => ({
+    ok: false as const,
+    response: Response.json(
+      { error: `Payload too large (max ${MAX_BODY_BYTES} bytes)` },
+      { status: 413 },
+    ),
+  })
 
-/** Validate a label (string or per-language record). Returns an error message or null. */
-function validateLabel(label: unknown, path: string): string | null {
-  if (typeof label === 'string') {
-    return label.length > MAX_LABEL_LENGTH ? `${path}.label exceeds ${MAX_LABEL_LENGTH} chars` : null
+  // Cheap shortcut for the honest clients, which all announce their length.
+  const contentLength = Number(req.headers?.get('content-length') ?? Number.NaN)
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    return tooLarge()
   }
-  if (typeof label === 'object' && label !== null && !Array.isArray(label)) {
-    for (const [lang, value] of Object.entries(label as Record<string, unknown>)) {
-      if (typeof value !== 'string') return `${path}.label.${lang} must be a string`
-      if (value.length > MAX_LABEL_LENGTH) {
-        return `${path}.label.${lang} exceeds ${MAX_LABEL_LENGTH} chars`
+
+  const stream = (req as unknown as { body?: ReadableStream<Uint8Array> | null }).body
+  let raw: string | null = null
+
+  // `getReader()` throws on a stream another layer has already locked or
+  // consumed. Called outside the guard below it escaped this function and the
+  // handler entirely — an uncontrolled 500 — and the `req.json()` fallback the
+  // comment above promises was never reached. Acquire it inside the guard so a
+  // locked stream degrades to that fallback instead.
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  try {
+    if (stream && typeof stream.getReader === 'function') {
+      reader = stream.getReader()
+    }
+  } catch {
+    reader = null
+  }
+
+  if (reader) {
+    const chunks: Uint8Array[] = []
+    let received = 0
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!value) continue
+        received += value.byteLength
+        if (received > MAX_BODY_BYTES) {
+          await reader.cancel().catch(() => {})
+          return tooLarge()
+        }
+        chunks.push(value)
       }
-    }
-    return null
-  }
-  return `${path}.label is required and must be a string or a per-language object`
-}
-
-/**
- * Validate one nav entry (item or child) and, recursively, its children.
- *
- * `href` and `icon` are required *strings*: the nav mounted in `beforeNavLinks`
- * calls `item.href.includes('?')` and `item.icon.startsWith('#')`, so a missing
- * value crashes the whole admin sidebar. Empty strings stay legal — that is how
- * the customizer stores a parent entry that only opens its children.
- */
-function validateNavEntry(entry: unknown, path: string, depth: number): string | null {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-    return `${path} must be an object`
-  }
-  const item = entry as Record<string, unknown>
-
-  if (typeof item.id !== 'string' || item.id.length === 0 || item.id.length > MAX_ID_LENGTH) {
-    return `${path}.id must be a non-empty string (max ${MAX_ID_LENGTH} chars)`
-  }
-
-  if (typeof item.href !== 'string') return `${path}.href is required and must be a string`
-  if (!isSafeHref(item.href)) {
-    return `${path}.href must be a relative path starting with '/' (no external or scripted URL)`
-  }
-
-  const labelError = validateLabel(item.label, path)
-  if (labelError) return labelError
-
-  if (typeof item.icon !== 'string' || item.icon.length > MAX_ICON_LENGTH) {
-    return `${path}.icon is required and must be a string (max ${MAX_ICON_LENGTH} chars)`
-  }
-
-  if (item.children !== undefined && item.children !== null) {
-    if (!Array.isArray(item.children)) return `${path}.children must be an array`
-    if (depth >= MAX_ENTRY_DEPTH) return `${path}.children exceeds the maximum nesting depth`
-    if (item.children.length > MAX_CHILDREN) {
-      return `${path}.children exceeds maximum of ${MAX_CHILDREN} entries`
-    }
-    for (let k = 0; k < item.children.length; k++) {
-      const childError = validateNavEntry(item.children[k], `${path}.children[${k}]`, depth + 1)
-      if (childError) return childError
-    }
-  }
-
-  return null
-}
-
-/** Validate a full navLayout payload. Returns an error message or null. */
-function validateNavLayout(navLayout: unknown): string | null {
-  if (typeof navLayout !== 'object' || navLayout === null || Array.isArray(navLayout)) {
-    return 'navLayout must be an object'
-  }
-
-  const layout = navLayout as Record<string, unknown>
-
-  // A navLayout without groups used to skip every check below and be persisted
-  // as-is, producing a stored layout the customizer cannot read back.
-  if (!Array.isArray(layout.groups)) return 'navLayout.groups must be an array'
-  if (layout.groups.length > MAX_GROUPS) {
-    return `navLayout.groups exceeds maximum of ${MAX_GROUPS} groups`
-  }
-
-  for (let i = 0; i < layout.groups.length; i++) {
-    const groupPath = `navLayout.groups[${i}]`
-    const group = layout.groups[i] as Record<string, unknown> | undefined
-    if (!group || typeof group !== 'object' || Array.isArray(group)) {
-      return `${groupPath} must be an object`
+    } catch {
+      return { ok: false, response: Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+    } finally {
+      reader.releaseLock?.()
     }
 
-    // Groups can use either 'title' or 'label' for the group name
-    const groupTitle = group.title ?? group.label
-    if (groupTitle === undefined || groupTitle === null) {
-      return `${groupPath}.title is required`
+    const merged = new Uint8Array(received)
+    let offset = 0
+    for (const chunk of chunks) {
+      merged.set(chunk, offset)
+      offset += chunk.byteLength
     }
-    if (typeof groupTitle !== 'string' && typeof groupTitle !== 'object') {
-      return `${groupPath}.title must be a string or object`
-    }
-
-    if (!Array.isArray(group.items)) return `${groupPath}.items must be an array`
-    if (group.items.length > MAX_ITEMS_PER_GROUP) {
-      return `${groupPath}.items exceeds maximum of ${MAX_ITEMS_PER_GROUP} items`
-    }
-
-    for (let j = 0; j < group.items.length; j++) {
-      const itemError = validateNavEntry(group.items[j], `${groupPath}.items[${j}]`, 1)
-      if (itemError) return itemError
-    }
+    raw = new TextDecoder().decode(merged)
   }
 
-  return null
+  try {
+    const parsed = raw !== null ? JSON.parse(raw) : await req.json!()
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { ok: false, response: Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+    }
+    return { ok: true, body: parsed as Record<string, unknown> }
+  } catch {
+    return { ok: false, response: Response.json({ error: 'Invalid JSON body' }, { status: 400 }) }
+  }
 }
 
 /** Extract user ID from request (works with object or primitive) */
@@ -189,22 +155,10 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
     if (!allowed) return rateLimitResponse(retryAfter)
 
     // Reject oversized bodies before buffering them into memory.
-    const contentLength = Number(req.headers?.get('content-length') ?? Number.NaN)
-    if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
-      return Response.json(
-        { error: `Payload too large (max ${MAX_BODY_BYTES} bytes)` },
-        { status: 413 },
-      )
-    }
+    const read = await readBoundedJsonBody(req)
+    if (!read.ok) return read.response
 
-    let body: Record<string, unknown>
-    try {
-      body = await req.json!() as Record<string, unknown>
-    } catch {
-      return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
-    }
-
-    const { navLayout, collapsedGroups } = body
+    const { navLayout, collapsedGroups } = read.body
 
     // At least one of navLayout or collapsedGroups must be provided
     if (navLayout === undefined && collapsedGroups === undefined) {
@@ -217,9 +171,15 @@ export function createSavePreferencesHandler(collectionSlug: string): PayloadHan
       if (layoutError) return Response.json({ error: layoutError }, { status: 400 })
     }
 
-    // Validate collapsedGroups if provided
-    if (collapsedGroups !== undefined && !Array.isArray(collapsedGroups)) {
-      return Response.json({ error: 'collapsedGroups must be an array' }, { status: 400 })
+    // Validate collapsedGroups if provided.
+    //
+    // Same rule as the collection field, not a looser one: `Array.isArray`
+    // alone accepted bodies the field then refused, and a field-level
+    // ValidationError lands in the catch below as an opaque 500 instead of a
+    // diagnosable 400.
+    if (collapsedGroups !== undefined) {
+      const collapsedError = validateCollapsedGroups(collapsedGroups)
+      if (collapsedError) return Response.json({ error: collapsedError }, { status: 400 })
     }
 
     try {

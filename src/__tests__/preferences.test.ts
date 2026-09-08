@@ -27,6 +27,8 @@ interface Doubles {
 function makeReq(options: {
   body?: unknown
   rawBody?: string
+  /** Body served as a ReadableStream, the way a real fetch Request exposes it. */
+  streamBody?: { chunk: string; times: number }
   contentLength?: number
   user?: { id: string; collection: string } | null
   existingDoc?: Record<string, unknown> | null
@@ -49,9 +51,27 @@ function makeReq(options: {
   const user =
     options.user === undefined ? { id: nextUserId(), collection: 'users' } : options.user
 
+  let body: ReadableStream<Uint8Array> | undefined
+  if (options.streamBody) {
+    const { chunk, times } = options.streamBody
+    const encoded = new TextEncoder().encode(chunk)
+    let sent = 0
+    body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= times) {
+          controller.close()
+          return
+        }
+        sent++
+        controller.enqueue(encoded)
+      },
+    })
+  }
+
   const req = {
     user,
     headers,
+    body,
     json: async () => {
       if (options.rawBody !== undefined) return JSON.parse(options.rawBody)
       return options.body
@@ -115,6 +135,75 @@ describe('PATCH /preferences — bornes du corps de requête', () => {
     expect(jsonSpy).not.toHaveBeenCalled()
     // Pile sur la limite, la requête passe.
     expect((await patch({ collapsedGroups: [] }, { contentLength: 256 * 1024 })).res.status).toBe(200)
+  })
+
+  it('refuse un layout hors gabarit même quand le transport ne l\'a pas compté', async () => {
+    // Le plafond de transport ne couvre que cette route ; le même document
+    // s'écrit aussi par la route REST de la collection, une migration ou un
+    // seed. La règle de volume vit donc avec les règles de forme, dans le
+    // validateur partagé : ce corps respecte tous les plafonds imbriqués
+    // (50 groupes x 100 items) et pèse pourtant plus de 256 Ko.
+    const oversized = {
+      version: 7,
+      groups: Array.from({ length: 50 }, (_, g) => ({
+        id: `g${g}`,
+        title: 'Content',
+        items: Array.from({ length: 100 }, (_, i) =>
+          entry({ id: `i${g}-${i}`, label: 'L'.repeat(200) }),
+        ),
+      })),
+    }
+
+    const { res, doubles, json } = await patch({ navLayout: oversized })
+
+    expect(res.status).toBe(400)
+    expect(String(json.error)).toContain('exceeds maximum size')
+    expect(doubles.create).not.toHaveBeenCalled()
+    expect(doubles.update).not.toHaveBeenCalled()
+  })
+
+  it('coupe un corps chunked sans Content-Length dès le dépassement, sans le bufferiser', async () => {
+    // Le plafond ne s'appliquait qu'en présence d'un Content-Length :
+    // `Number(null)` vaut NaN, `Number.isFinite(NaN)` est faux, et l'exécution
+    // tombait sur un `req.json()` qui bufferisait tout le flux. Une seule
+    // requête suffisait à épuiser le tas — le rate limit n'y peut rien.
+    const { req, doubles } = makeReq({
+      streamBody: { chunk: 'x'.repeat(64 * 1024), times: 64 }, // 4 Mo annoncés nulle part
+    })
+    const jsonSpy = vi.spyOn(req as unknown as { json: () => Promise<unknown> }, 'json')
+
+    const res = await save(req)
+
+    expect(res.status).toBe(413)
+    expect(jsonSpy).not.toHaveBeenCalled()
+    expect(doubles.find).not.toHaveBeenCalled()
+  })
+
+  it('lit normalement un corps chunked qui tient dans le plafond', async () => {
+    const payload = JSON.stringify({ collapsedGroups: ['content'] })
+    const { req, doubles } = makeReq({ streamBody: { chunk: payload, times: 1 } })
+
+    const res = await save(req)
+
+    expect(res.status).toBe(200)
+    expect(doubles.create.mock.calls[0]![0].data.collapsedGroups).toEqual(['content'])
+  })
+
+  it('retombe sur req.json() quand le flux est déjà verrouillé, sans 500 non maîtrisé', async () => {
+    // `stream.getReader()` était appelé hors du try : sur un flux qu'une autre
+    // couche a déjà verrouillé ou consommé, la TypeError remontait hors du
+    // handler — 500 non maîtrisé — et le repli annoncé n'était jamais atteint.
+    const { req, doubles } = makeReq({ body: { collapsedGroups: ['content'] } })
+    ;(req as unknown as { body: unknown }).body = {
+      getReader: () => {
+        throw new TypeError('ReadableStream is locked')
+      },
+    }
+
+    const res = await save(req)
+
+    expect(res.status).toBe(200)
+    expect(doubles.create.mock.calls[0]![0].data.collapsedGroups).toEqual(['content'])
   })
 
   it('répond 400 sur un corps JSON illisible', async () => {
@@ -297,6 +386,26 @@ describe('PATCH /preferences — persistance', () => {
     const { res } = await patch({ collapsedGroups: 'content' })
 
     expect(res.status).toBe(400)
+  })
+
+  it('applique aux groupes repliés la règle exacte du champ, en 400 et non en 500', async () => {
+    // L'endpoint ne vérifiait que `Array.isArray` alors que le champ de la
+    // collection borne aussi le type et la taille des entrées : un corps
+    // accepté ici mais refusé là levait une ValidationError, attrapée par le
+    // catch de persistance et rendue en 500 opaque.
+    const notStrings = await patch({ collapsedGroups: [{ id: 'content' }] })
+    expect(notStrings.res.status).toBe(400)
+    expect(notStrings.json.error).toContain('strings')
+    expect(notStrings.doubles.create).not.toHaveBeenCalled()
+
+    const tooLong = await patch({ collapsedGroups: ['x'.repeat(101)] })
+    expect(tooLong.res.status).toBe(400)
+
+    const tooMany = await patch({
+      collapsedGroups: Array.from({ length: 51 }, (_, i) => `g${i}`),
+    })
+    expect(tooMany.res.status).toBe(400)
+    expect(tooMany.json.error).toContain('50')
   })
 
   it('rend un 500 sans faire fuiter la stack quand la base est indisponible', async () => {
