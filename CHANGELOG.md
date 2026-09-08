@@ -5,6 +5,44 @@ All notable changes to `@consilioweb/payload-admin-nav` will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-09-08
+
+Security release, hours after 0.17.0. 0.16.0 closed the six endpoints and 0.17.0 the preferences
+collection — both left the plugin's own admin view guarded by a bare `req.user` check, which
+Payload does not supplement for custom views. Anyone whose app declares a second auth collection,
+or an admin role that `access.admin` refuses, should upgrade now; a single-auth-collection app is
+only affected by the peer-range issue below.
+
+### Security
+
+- **`/admin/nav-customizer` handed the admin shell to any authenticated account, from any auth collection.** Payload does not gate custom admin views: `RootPage` skips its `canAccessAdmin` redirect as soon as `isCustomAdminView` matches the current route, and that helper only compares the URL path against the registered view paths — it tests no visibility or `public` flag, despite what its docblock announces — so authorization is delegated entirely to the view component. This one checked `initPageResult.req.user` and stopped there. The `payload-token` cookie is shared by every auth collection, so an ordinary front-office account (customers, members, subscribers) that logged in through its own collection arrived here authenticated, and received the admin shell plus what `RootPage` had already prepared for it: the full client config — every collection and global with its field schemas — and `visibleEntities`, every non-hidden slug. That is strictly more than what `/default-nav` and `/discover` have refused the same account since 0.16.0. A member of the admin collection whom `access.admin` refuses got the same thing. The view now applies the endpoints' gate before rendering anything and redirects everyone else to the host's unauthorized view. **The hole is as old as the view itself, 0.17.0 included. What leaked is read access — the customizer's writes go through `PATCH /preferences`, which has refused non-admin callers since 0.16.0, so there is no corrupted data to repair. Look instead for hits on `/admin/nav-customizer` (or its equivalent under a renamed `routes.admin`) from sessions that appear nowhere else in the panel, and treat your admin field schemas as having been readable by every account that could log in anywhere.**
+
+- **The peer range still accepted Payload releases with a pre-authentication account takeover.** `peerDependencies.payload` was `^3.0.0`, so installing this plugin told npm that any Payload 3 was a supported host — including the releases affected by [GHSA-hp5w-3hxx-vmwf] (pre-auth account takeover) and by an SQL injection, both fixed upstream in `3.79.1`. The plugin never shipped either flaw, but it also never warned anybody off a host that had them. The floor is now `^3.79.1` for `payload`, `@payloadcms/next`, `@payloadcms/ui` and `@payloadcms/translations`, which ship in lockstep. **Check what your app actually resolves — `npm ls payload` / `pnpm why payload` — rather than what your manifest asks for.**
+
+[GHSA-hp5w-3hxx-vmwf]: https://github.com/payloadcms/payload/security/advisories/GHSA-hp5w-3hxx-vmwf
+
+### Breaking
+
+- **Payload `^3.0.0` → `^3.79.1` in `peerDependencies`**, for `payload`, `@payloadcms/next`, `@payloadcms/ui` and the optional `@payloadcms/translations`. Installing on an older Payload now raises an `ERESOLVE` / peer warning; upgrade the host rather than pinning an older release of this plugin. `next`, `react`, `react-dom` and `engines.node` are unchanged.
+
+- **Non-admin accounts no longer reach the customizer view.** An unauthenticated visitor is sent to the host's login route, and an authenticated caller who is not an admin-panel user — wrong collection, or refused by that collection's `access.admin` — to `admin.routes.unauthorized`. A throwing `access.admin` counts as a denial, as it already did on the endpoints. Apps whose only auth collection is the admin one, and whose administrators all pass `access.admin`, see no change.
+
+- **`NavCustomizerView` is now an async server component.** Its type went from `React.FC<AdminViewServerProps>` to a function returning `Promise<React.ReactElement>`, because the gate has to await the host's `access.admin`. Payload's own view rendering awaits it and needs no change; a wrapper that imported it from `@consilioweb/payload-admin-nav/views` and annotated it as `React.FC` will now fail to typecheck.
+
+### Fixed
+
+- **The view's redirects no longer assume `/admin`.** An unauthenticated visitor was sent to a hardcoded `/admin/login` — a 404 on any app that moved `routes.admin` or renamed `admin.routes.login`. Both redirects are now built with `formatAdminURL` from the host's own `routes.admin` and `admin.routes.login` / `admin.routes.unauthorized`, the way Payload's `handleAuthRedirect` does it.
+
+### Changed
+
+- **The admin check is one implementation shared by the endpoints and the view.** `hasAdminAccess(req)` is the predicate — belong to `config.admin.user`, then pass that collection's `access.admin` when one is declared — and `requireAdmin(req)` is now the thin `Response` wrapper over it. Endpoint behaviour is identical (`401` with no user, `403` otherwise). Neither symbol is exported from the package; the point is that hardening one caller can no longer leave the other behind.
+- **`dist/utils/requireAdmin.js` is emitted as a standalone file.** The views build pass runs with `bundle: false`, so the view's relative import needs that file to exist rather than be inlined into the bundled server entry. `pnpm verify:dist` now asserts it is present and carries no `"use client"` directive, so a build that drops it fails instead of publishing a view whose import resolves to nothing.
+
+### Added
+
+- 8 more vitest tests (126 → 134), all on the view's gate: anonymous visitor, front-office account, admin-collection member refused by `access.admin`, host declaring no `admin.user`, a throwing `access.admin` (fail-closed), host-specific admin routes, and the two paths that must keep working — a legitimate administrator renders, and the resolved `basePath` still reaches the client component.
+- README: the view gate is documented under *Permission-Aware*, and the requirements tables carry the `3.79.1` floor with the reason for it.
+
 ## [0.17.0] - 2026-09-08
 
 Security release. Everything up to and including 0.16.1 is affected by the issues below.
@@ -260,6 +298,7 @@ Admin-only endpoints, permission filtering that actually runs, a white-label sid
 - `useNavPreferences` React hook
 - TypeScript strict mode, full type exports
 
+[0.18.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.16.1...v0.17.0
 [0.16.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.15.0...v0.16.0
 [0.12.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.11.0...v0.12.0

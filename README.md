@@ -110,6 +110,12 @@ Powered by [@dnd-kit](https://dndkit.com/), bundled into the package:
   left untouched
 - All six endpoints are restricted to admin-panel users: the caller must belong to
   `config.admin.user` and pass that collection's `access.admin` when one is declared
+- The `/admin/nav-customizer` view applies that exact same rule before it renders anything.
+  Payload does **not** gate custom admin views — `RootPage` skips its `canAccessAdmin` redirect as
+  soon as the route matches a registered custom view — so every request carrying any valid
+  `payload-token` reaches the view, including one from a front-office auth collection sharing the
+  cookie. Anyone who is not an admin-panel user is sent to `admin.routes.unauthorized` instead of
+  receiving the admin shell and the full client config
 - The preferences collection applies the same rule on its own REST route: every operation requires
   the caller to belong to `userCollectionSlug`, so an account authenticated against another auth
   collection (customers, members) is refused even when its numeric id matches an administrator's
@@ -170,15 +176,23 @@ yarn add @consilioweb/payload-admin-nav
 
 | Package | Version | Required |
 |---------|---------|----------|
-| `payload` | `^3.0.0` | Yes |
-| `@payloadcms/ui` | `^3.0.0` | Yes |
-| `@payloadcms/next` | `^3.0.0` | Yes |
+| `payload` | `^3.79.1` | Yes |
+| `@payloadcms/ui` | `^3.79.1` | Yes |
+| `@payloadcms/next` | `^3.79.1` | Yes |
 | `next` | `^15.4.11 \|\| ^16.0.0` | Yes |
 | `react` | `^19.0.0` | Yes |
 | `react-dom` | `^19.0.0` | Yes |
-| `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
+| `@payloadcms/translations` | `^3.79.1` | Optional (i18n) |
 
-Any Payload 3 admin app already has all the required ones.
+Any recent Payload 3 admin app already has all the required ones.
+
+> **Why `3.79.1` and not `3.0.0`?** Payload releases below `3.79.1` are affected by a
+> pre-authentication account takeover ([GHSA-hp5w-3hxx-vmwf]) and by an SQL injection. A
+> plugin peer range that still accepted them told npm those installs were fine, which they
+> are not. The `@payloadcms/*` packages ship in lockstep with `payload`, so they carry the
+> same floor.
+
+[GHSA-hp5w-3hxx-vmwf]: https://github.com/payloadcms/payload/security/advisories/GHSA-hp5w-3hxx-vmwf
 
 ### Next.js 16 + Turbopack
 
@@ -854,13 +868,13 @@ import { NavCustomizerView } from '@consilioweb/payload-admin-nav/views'
 | | Version |
 |---|---|
 | **Node.js** | `^18.20.2 \|\| >=20.9.0` |
-| **Payload CMS** | `^3.0.0` |
+| **Payload CMS** | `^3.79.1` |
 | **Next.js** | `^15.4.11 \|\| ^16.0.0` |
 | **React / React DOM** | `^19.0.0` |
 | **Database** | Any Payload-supported adapter (SQLite, PostgreSQL, MongoDB) |
 
-React 18, Next 14 and Next 15.0–15.4.10 are no longer supported: installing on them raises an
-`ERESOLVE` / peer warning.
+React 18, Next 14, Next 15.0–15.4.10 and Payload below `3.79.1` are no longer supported:
+installing on them raises an `ERESOLVE` / peer warning.
 
 ## Migration from `@consilioweb/admin-nav`
 

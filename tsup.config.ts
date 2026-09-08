@@ -160,6 +160,12 @@ export default defineConfig([
       'src/views.ts',
       'src/views/NavCustomizerView.tsx',
       'src/views/NavCustomizerViewClient.tsx',
+      // The view gates itself with the same admin check as the endpoints. This
+      // pass is `bundle: false`, so the emitted `../utils/requireAdmin.js`
+      // import needs that file to actually exist in dist — pass 1 only inlines
+      // it into the bundled server entry. Without this entry the published view
+      // would import a file that was never written.
+      'src/utils/requireAdmin.ts',
     ],
     bundle: false,
     onSuccess: async () => {

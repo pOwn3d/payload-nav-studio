@@ -32,7 +32,14 @@ const MUST_HAVE_DIRECTIVE = [
  * Files that MUST NOT carry it: the client barrel (Turbopack evaluates barrel
  * re-exports in SSR context) and the server component view.
  */
-const MUST_NOT_HAVE_DIRECTIVE = ['dist/client.js', 'dist/views/NavCustomizerView.js']
+const MUST_NOT_HAVE_DIRECTIVE = [
+  'dist/client.js',
+  'dist/views/NavCustomizerView.js',
+  // Server-only admin gate the view imports by relative path. The views pass is
+  // `bundle: false`, so this file has to be emitted on its own — a missing entry
+  // would ship a view whose import resolves to nothing.
+  'dist/utils/requireAdmin.js',
+]
 
 /** Public entrypoints, as declared by the `exports` map. */
 const ENTRYPOINTS = ['index', 'client', 'views']
