@@ -5,6 +5,46 @@ All notable changes to `@consilioweb/payload-admin-nav` will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-09-08
+
+Security release. Everything up to and including 0.16.1 is affected by the issues below.
+
+### Security
+
+- **The preferences collection was reachable on the auto-generated REST API by any authenticated account, on any auth collection.** 0.16.0 restricted the six `/api/admin-nav/*` endpoints to admin-panel users, but `admin-nav-preferences` is an ordinary collection: `admin.hidden: true` hides the admin UI entry, never `/api/admin-nav-preferences`. Its `create` rule required only `!!req.user` — true for a front-office customer, member or subscriber — and its `read` / `update` / `delete` rules returned `{ user: { equals: req.user.id } }` without ever looking at `req.user.collection`. A single-target `relationship` is stored as a bare id, so that constraint compares two integers whatever collection they came from: with auto-incremented ids (SQLite, Postgres) front-office customer #3 was handed administrator #3's row and could rewrite or delete it. Every operation now also requires the caller to belong to `userCollectionSlug` (default `users`) — the rule `requireAdmin` already applied to the endpoints. **If your app declares a second auth collection, audit `admin-nav-preferences` for rows their owner did not write.**
+
+- **The `user` field of a preferences row was writable from a request.** Payload's relationship validation checks the *format* of an id, never its existence nor who sent it, and no hook constrained the field. An authenticated caller could create the administrator's row on their behalf — and, `user` being `unique`, squat the index so that administrator could never save their own preferences again — or re-assign an existing row to a colleague by PATCHing `user`. The owner is now set server-side by a `beforeValidate` hook, and the field is refused on `create` and `update` by field access. The plugin's own Local API writes pass the owner explicitly and are unaffected.
+
+- **`navLayout` and `collapsedGroups` were stored unvalidated on that same REST route.** Everything 0.16.0 added lived inside the PATCH endpoint, so writing through the collection bypassed `isSafeHref`, the size cap and the nesting caps entirely. Those rules now live in a shared module and also run as field `validate`, so both doors apply the same thing. They judge the value a request actually *sets*: a field left out of an update is not re-judged against the stored row, so a layout written before this release does not make its row immutable — it is neutralised at render time instead (see below).
+
+- **`GET /badges` returned counters and entry ids for the very entries `GET /default-nav` hides from that user.** It was the only one of the six endpoints that never called the permission filter: it iterated the whole `defaultNav` and ran every badge resolver through the Local API, i.e. with `overrideAccess: true`. Any admin-panel account, including the lowest-privileged role, could poll it at 120 req/min and read the id of each hidden entry plus the live business counter behind it — open tickets, pending orders, failed emails, whatever the host configured as a `groupBadge` / `childBadge`. The handler now filters `defaultNav` with the same primitive as `/default-nav` and `/discover` before resolving anything.
+
+- **Permission filtering failed open, silently, for the whole nav.** `getAccessResults` fans out over every collection and global in a single `Promise.all` and does not isolate a throwing host access function — an explicit `throw new Forbidden()`, or the far more common `user.roles.includes('admin')` on a user whose `roles` is `undefined`, rejects the entire computation. The `catch` then returned the *unfiltered* nav, handing that user the complete map of the panel: every collection and global slug, including the ones `admin.hidden` keeps out of the UI and `autoDiscoverNav` deliberately keeps in, plus every custom admin view path. It now fails closed — every entry pointing at a registered collection or global is dropped, custom routes are kept since they were never filtered anyway — and the failure is logged through `payload.logger.warn` instead of passing unnoticed.
+
+- **The 256 KB ceiling on `PATCH /preferences` was bypassable.** It was read from `Content-Length` alone: a `Transfer-Encoding: chunked` request carries no such header, the guard fell through and `req.json()` buffered the whole stream. Next caps nothing on App Router route handlers and Payload only caps multipart uploads, so one request from the lowest-privileged admin account was enough to exhaust the heap; a 30 req/min limit does not help when one request is enough. The body is now read through a counting stream reader and abandoned with `413` as soon as it goes over. The *stored* value is bounded too — a serialized `navLayout` over 256 KB is refused — so the collection's REST route no longer persists an oversized layout that every subsequent read would re-serialize. Be aware of what that second half does not do: a field `validate` runs after Payload has parsed the request, so an oversized body sent to `/api/admin-nav-preferences` is still buffered before being refused. Set `endpoints: false` on that collection if your consumers never call its REST route.
+
+- **A stored layout was rendered without ever being re-checked.** `isSafeHref` only ever ran on the write paths, so a row that reached the database another way — the REST route above, a migration, a seed script, a restored backup, or a version of this plugin older than the write-side validation — went straight into `<Link href>`. Two consequences: an off-site or scripted `href` wearing the label and icon of a legitimate entry ("Users", "Media") inside the trusted chrome of the admin panel; and a non-string `icon` or a missing `href` throwing inside a component mounted in `beforeNavLinks`, that is on *every* page of the panel, with the "Customize" link needed to repair it sitting in the sidebar that just crashed. The sidebar now re-checks what it reads — from the server *and* from its own cache — drops the entries that fail, keeps the rest of the customization, and falls back to the default nav with a `console.warn` when nothing usable remains. Keys the nav model does not describe are no longer copied out of the row, so an arbitrary blob parked under an arbitrary key no longer reaches the browser.
+
+- **The client-side nav cache survived a logout and was served to the next account in the tab.** Neither tier was scoped to a session: `sessionStorage` lives as long as the tab and the module-level variables as long as the JS context, while logging out and back in is a same-tab client-side navigation. The next viewer inherited the previous one's sidebar *and* their `defaultNav` — already trimmed by the permission filter to what that first user was allowed to see — and the 60-second freshness window meant no fetch went out to correct it. Both tiers are now stamped with the viewer they were filled for, are never read for anybody else, and a cache belonging to a different viewer is cleared on mount.
+
+### Fixed
+
+- `collapsedGroups` was checked with `Array.isArray` alone by the PATCH endpoint and not at all by the collection, so an unbounded array of arbitrary values was accepted and stored. Both apply the same rule now — at most 50 entries, each a string of at most 100 characters — and an over-long list is a diagnosable `400` instead of the opaque `500` a field-level `ValidationError` produced. Non-string entries read back from the cache are dropped rather than rendered.
+- The nav cache is neither read nor written while the viewer is unknown, and a `sessionStorage` that is absent or throws (server render, blocked site data) now degrades to a plain fetch in one place instead of being caught at each call site.
+
+### Changed
+
+- **`useNavPreferences` takes a second argument.** `useNavPreferences(basePath = '/api/admin-nav', ownerKey = null)`, where `ownerKey` identifies the viewer the cache belongs to — build it with the new `cacheOwnerKey(user)` from `useAuth()`. The bundled `AdminNav` and `NavCustomizer` already pass it. **Called with one argument, as any custom caller written against 0.16.x does, the hook now caches nothing and fetches on every mount**: an entry with no owner could not be refused to the next account signing in from the same tab. Pass the second argument to get the caching back.
+- `AdminNav` and `NavCustomizer` call `useAuth()` from `@payloadcms/ui` and must therefore render inside Payload's admin providers — which is where the plugin mounts them. A copy mounted outside that tree loses its cache rather than raising.
+- Restricted roles see fewer badges: `/badges` answers only for the entries that survive permission filtering, at the cost of one `getAccessResults` per poll (the sidebar polls once every 60 s). The result is deliberately not memoized per user — that would trade a confirmed leak for a cache keyed on an identity, which is how stale permissions get served after a role change.
+- A `defaultNav` entry that does not satisfy the shape rules — a non-string `icon`, an `href` that is not a safe relative path, a group with no `id` or with a non-string title — is now dropped when the sidebar renders from its cache, as is a group those drops leave empty. The same shape has been refused on write since 0.16.0; fix the entry rather than expect the cached copy to keep showing it.
+
+### Added
+
+- **`cacheOwnerKey(user)`**, exported from `@consilioweb/payload-admin-nav/client` alongside `useNavPreferences`.
+- 44 more vitest tests (82 → 126), covering the collection's access rules and owner hook, the read-side sanitizer, the viewer-scoped cache and the bounded body reader.
+- Supply-chain hardening of the release pipeline: every GitHub Action is pinned to a commit SHA instead of a mutable tag, a `Security` workflow runs `pnpm audit --audit-level high`, gitleaks and CodeQL (`security-extended`) on push, on pull request and weekly, and Dependabot watches npm and Actions with major bumps of the peer-range packages (`payload`, `react`, `react-dom`, `next`) excluded.
+
 ## [0.16.1] - 2026-09-07
 
 ### Fixed
@@ -220,6 +260,7 @@ Admin-only endpoints, permission filtering that actually runs, a white-label sid
 - `useNavPreferences` React hook
 - TypeScript strict mode, full type exports
 
+[0.17.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.16.1...v0.17.0
 [0.16.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.15.0...v0.16.0
 [0.12.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/pOwn3d/payload-nav-studio/compare/v0.10.0...v0.11.0

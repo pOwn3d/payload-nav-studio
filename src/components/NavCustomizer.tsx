@@ -19,7 +19,8 @@ import {
   arrayMove,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable'
-import { useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
+import { useAuth } from '@payloadcms/ui'
+import { cacheOwnerKey, useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { SortableGroup } from './SortableGroup.js'
 import { SortableItem } from './SortableItem.js'
 import { GroupEditor } from './GroupEditor.js'
@@ -148,7 +149,12 @@ function navReducer(state: NavState, action: NavAction): NavState {
  */
 export const NavCustomizer: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
   const { t, i18n } = usePluginTranslation()
-  const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences(basePath)
+  // Same viewer-scoped cache as the sidebar — see AdminNav.
+  const { user } = useAuth()
+  const { layout, isLoaded, isSaving, isCustom, save, reset } = useNavPreferences(
+    basePath,
+    cacheOwnerKey(user),
+  )
   const [navState, dispatch] = useReducer(navReducer, initialNavState)
   const { groups, undoStack, redoStack } = navState
   const [initialized, setInitialized] = useState(false)

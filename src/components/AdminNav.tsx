@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
+import { useAuth } from '@payloadcms/ui'
+import { cacheOwnerKey, useNavPreferences, DEFAULT_BASE_PATH } from '../hooks/useNavPreferences.js'
 import { usePluginTranslation } from '../hooks/usePluginTranslation.js'
 import { StyleInjector } from './StyleInjector.js'
 import { NavUserProfile } from './NavUserProfile.js'
@@ -155,7 +156,14 @@ interface DefaultNavMeta {
  */
 const AdminNav: React.FC<{ basePath?: string }> = ({ basePath = DEFAULT_BASE_PATH }) => {
   const { t, i18n } = usePluginTranslation()
-  const { layout, isLoaded, collapsedGroups, setCollapsedGroups } = useNavPreferences(basePath)
+  // The nav cache outlives a logout (sessionStorage lives as long as the tab,
+  // the module cache as long as the JS context): it is scoped to the viewer so
+  // the next account does not inherit this one's permission-filtered sidebar.
+  const { user } = useAuth()
+  const { layout, isLoaded, collapsedGroups, setCollapsedGroups } = useNavPreferences(
+    basePath,
+    cacheOwnerKey(user),
+  )
 
   // Next.js reactive hooks — update instantly on client-side navigation
   const pathname = usePathname()
