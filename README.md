@@ -1031,4 +1031,4 @@ db.getCollection('admin-nav-preferences').drop()
 
 ## License
 
-[MIT](LICENSE) — [ConsilioWEB](https://consilioweb.fr)
+[MIT](LICENSE) — [ConsilioWEB](https://consilioweb.fr/services/developpement-web/payload-cms)
